@@ -17,11 +17,13 @@ features
 - cute Panda integration in the beautiful and functional UI (follows Apple Human Interface Guidelines)
 - home screen has health categories (heart, sleep, mindfulness, etc)
     - clicking on categories will give LLM historical HealthKit data to see if you're trending positive or negative, then display to the user encouragement if they're trending positive, and what they can improve if a vital is trending negative
+    - if there's zero data from the categories we tried to pull from, use the LLM to suggest that the user sync their data or give us more permissions to access that specific health information
 
 AI dev advice
 - use modern approachable 6.2 Swift Concurrency
     - your knowledge cutoff date probably doesn't have this info; search the web for latest concurrency info when creating items where race conditions matter
 - code should be modular for testability and reusability
+    - core components should have a base class (eg. BaseButton -> CheckboxButton)
 - since this is a portfolio project for large tech companies, ensure that it uses data structures in an efficient manner
     - when implementing a feature that could take a while, use the most efficient Big O notation possible, and explain your decision with comments
 - build and run the app on the iPhone 17 Pro. you're using Xcode 26.2 to build this, same with the CLT
