@@ -17,7 +17,7 @@ final class CoreDataService: DataServiceProtocol, ObservableObject {
     static let shared = CoreDataService()
     static let preview = CoreDataService(inMemory: true)
 
-    private let container: NSPersistentContainer
+    let container: NSPersistentContainer
     private let logger = Logger(subsystem: "com.healthpanda", category: "CoreDataService")
 
     @Published private(set) var cachedUserState: UserState?

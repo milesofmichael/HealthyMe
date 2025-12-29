@@ -7,71 +7,23 @@
 
 import SwiftUI
 
-// MARK: - Home View Model
-
-@Observable
-final class HomeViewModel {
-    private(set) var aiStatus: AiAvailabilityStatus = .available
-    private(set) var healthStatus: HealthAuthorizationStatus = .notDetermined
-    private(set) var isLoading = true
-
-    // Track which categories have data (for warning tiles)
-    private(set) var categoriesWithData: Set<HealthCategory> = []
-
-    private let aiService: AiServiceProtocol
-    private let healthService: HealthServiceProtocol
-
-    init(
-        aiService: AiServiceProtocol = FoundationModelService.shared,
-        healthService: HealthServiceProtocol = HealthService.shared
-    ) {
-        self.aiService = aiService
-        self.healthService = healthService
-    }
-
-    func loadStatus() async {
-        isLoading = true
-        defer { isLoading = false }
-
-        async let ai = aiService.checkAvailability()
-        async let health = healthService.checkAuthorizationStatus()
-
-        aiStatus = await ai
-        healthStatus = await health
-
-        // For now, simulate that we have data for some categories
-        // In production, this would query HealthKit for each category
-        if healthStatus == .authorized {
-            categoriesWithData = [.heart, .activity, .body]
-        }
-    }
-
-    func requestHealthPermissions() async {
-        _ = try? await healthService.requestAuthorization()
-        healthStatus = await healthService.checkAuthorizationStatus()
-    }
-
-    func openSettings() {
-        if let url = URL(string: UIApplication.openSettingsURLString) {
-            UIApplication.shared.open(url)
-        }
-    }
-
-    func hasData(for category: HealthCategory) -> Bool {
-        categoriesWithData.contains(category)
-    }
-}
-
-// MARK: - Home View
-
 struct HomeView: View {
-    @State private var viewModel = HomeViewModel()
+    // Local UI state
+    @State private var isLoading = true
+    @State private var aiStatus: AiAvailabilityStatus = .available
+    @State private var healthStatus: HealthAuthorizationStatus = .notDetermined
+    @State private var heartSummary: CategorySummary?
+    @State private var selectedCategory: HealthCategory?
+
+    // Services accessed directly
+    private let aiService: AiServiceProtocol = FoundationModelService.shared
+    private let healthService: HealthServiceProtocol = HealthService.shared
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
-                    if viewModel.isLoading {
+                    if isLoading {
                         loadingView
                     } else {
                         tileGrid
@@ -81,15 +33,18 @@ struct HomeView: View {
             }
             .navigationTitle("Health Panda")
             .refreshable {
-                await viewModel.loadStatus()
+                await refresh()
+            }
+            .sheet(item: $selectedCategory) { category in
+                CategoryDetailView(category: category, summary: heartSummary)
             }
         }
         .task {
-            await viewModel.loadStatus()
+            await loadInitialState()
         }
     }
 
-    // MARK: - Loading View
+    // MARK: - Loading
 
     private var loadingView: some View {
         VStack(spacing: 16) {
@@ -100,16 +55,47 @@ struct HomeView: View {
         .frame(maxWidth: .infinity, minHeight: 200)
     }
 
+    private func loadInitialState() async {
+        isLoading = true
+        defer { isLoading = false }
+
+        // Check system status concurrently
+        async let ai = aiService.checkAvailability()
+        async let health = healthService.checkAuthorizationStatus()
+
+        aiStatus = await ai
+        healthStatus = await health
+
+        // Load cached summary if available
+        if healthStatus == .authorized {
+            heartSummary = await HealthRepository.shared.getCachedSummary(for: .heart)
+
+            // Refresh if stale or missing
+            if heartSummary == nil || heartSummary?.isStale == true {
+                heartSummary = await HealthRepository.shared.refreshHeart()
+            }
+        }
+    }
+
+    private func refresh() async {
+        async let ai = aiService.checkAvailability()
+        async let health = healthService.checkAuthorizationStatus()
+
+        aiStatus = await ai
+        healthStatus = await health
+
+        if healthStatus == .authorized {
+            heartSummary = await HealthRepository.shared.refreshHeart()
+        }
+    }
+
     // MARK: - Tile Grid
 
     private var tileGrid: some View {
         VStack(spacing: 12) {
-            // System status tiles (errors first)
             systemStatusTiles
-
-            // Health category tiles
             if healthStatus == .authorized {
-                categoryTiles
+                heartTile
             }
         }
     }
@@ -118,8 +104,7 @@ struct HomeView: View {
 
     @ViewBuilder
     private var systemStatusTiles: some View {
-        // AI unavailable - device doesn't support Apple Intelligence
-        if case .unavailableDevice(let reason) = viewModel.aiStatus {
+        if case .unavailableDevice(let reason) = aiStatus {
             ErrorTile(
                 icon: "cpu",
                 title: "Unsupported Device",
@@ -127,18 +112,16 @@ struct HomeView: View {
             )
         }
 
-        // AI disabled by user - needs to enable Apple Intelligence
-        if viewModel.aiStatus == .disabledByUser {
+        if aiStatus == .disabledByUser {
             ErrorTile(
                 icon: "brain",
                 title: "Apple Intelligence Required",
                 subtitle: "Enable in Settings to continue"
             ) {
-                viewModel.openSettings()
+                openSettings()
             }
         }
 
-        // Health unavailable
         if healthStatus == .unavailable {
             ErrorTile(
                 icon: "heart.slash",
@@ -147,94 +130,90 @@ struct HomeView: View {
             )
         }
 
-        // Health not authorized
         if healthStatus == .notDetermined {
             ErrorTile(
                 icon: "heart.text.clipboard",
                 title: "Health Permissions Needed",
                 subtitle: "Tap to grant access to your health data"
             ) {
-                Task { await viewModel.requestHealthPermissions() }
+                Task { await requestHealthPermissions() }
             }
         }
     }
 
-    // MARK: - Category Tiles
-
-    private var categoryTiles: some View {
-        ForEach(HealthCategory.allCases, id: \.self) { category in
-            categoryTile(for: category)
-        }
-    }
+    // MARK: - Heart Tile
 
     @ViewBuilder
-    private func categoryTile(for category: HealthCategory) -> some View {
-        if viewModel.hasData(for: category) {
+    private var heartTile: some View {
+        let category = HealthCategory.heart
+
+        if let summary = heartSummary {
+            switch summary.status {
+            case .noData:
+                ErrorTile(
+                    icon: category.icon,
+                    title: category.rawValue,
+                    subtitle: summary.smallSummary
+                ) {
+                    selectedCategory = category
+                }
+
+            case .missingCritical:
+                WarningTile(
+                    icon: category.icon,
+                    title: category.rawValue,
+                    subtitle: summary.smallSummary
+                ) {
+                    selectedCategory = category
+                }
+
+            case .ready:
+                Tile(
+                    icon: category.icon,
+                    iconColor: category.color,
+                    title: category.rawValue,
+                    subtitle: summary.smallSummary
+                ) {
+                    selectedCategory = category
+                }
+            }
+        } else {
+            // Loading state for heart tile
             Tile(
                 icon: category.icon,
                 iconColor: category.color,
                 title: category.rawValue,
-                subtitle: category.subtitle
-            ) {
-                // Navigate to category detail
-            }
-        } else {
-            WarningTile(
-                icon: category.icon,
-                title: category.rawValue,
-                subtitle: "No data available"
-            ) {
-                // Navigate to help/sync instructions
-            }
+                subtitle: "Loading..."
+            )
         }
     }
 
-    private var healthStatus: HealthAuthorizationStatus {
-        viewModel.healthStatus
+    // MARK: - Actions
+
+    private func requestHealthPermissions() async {
+        _ = try? await healthService.requestAuthorization()
+        healthStatus = await healthService.checkAuthorizationStatus()
+
+        if healthStatus == .authorized {
+            heartSummary = await HealthRepository.shared.refreshHeart()
+        }
     }
+
+    private func openSettings() {
+        if let url = URL(string: UIApplication.openSettingsURLString) {
+            UIApplication.shared.open(url)
+        }
+    }
+}
+
+// MARK: - HealthCategory Identifiable
+
+extension HealthCategory: Identifiable {
+    var id: String { rawValue }
 }
 
 // MARK: - Previews
 
-#Preview("Home - Loading") {
+#Preview("Home") {
     HomeView()
-}
-
-#Preview("Tiles") {
-    ScrollView {
-        VStack(spacing: 12) {
-            ErrorTile(
-                icon: "cpu",
-                title: "Unsupported Device",
-                subtitle: "This device doesn't support Apple Intelligence"
-            )
-
-            ErrorTile(
-                icon: "heart.slash",
-                title: "Health Permissions Needed",
-                subtitle: "Tap to grant access"
-            )
-
-            WarningTile(
-                icon: "moon.fill",
-                title: "Sleep",
-                subtitle: "No data available"
-            )
-
-            Tile(
-                icon: "heart.fill",
-                iconColor: .pink,
-                title: "Heart",
-                subtitle: "Heart rate, blood pressure, HRV"
-            )
-
-            Tile(
-                icon: "figure.run",
-                iconColor: .green,
-                title: "Activity",
-                subtitle: "Steps, workouts, calories"
-            )
-        }
-        .padding()
-    }
 }

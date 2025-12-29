@@ -23,14 +23,9 @@ final class HealthService: HealthServiceProtocol {
         .heart: [
             .heartRate,
             .restingHeartRate,
-            .walkingHeartRateAverage,
-            .heartRateVariabilitySDNN,
-            .heartRateRecoveryOneMinute,
-            .bloodPressureSystolic,
-            .bloodPressureDiastolic,
             .oxygenSaturation,
-            .vo2Max,
-            .peripheralPerfusionIndex
+            .walkingHeartRateAverage,
+            .heartRateVariabilitySDNN
         ],
         .sleep: [
             // Sleep uses category types, not quantity types
@@ -95,11 +90,7 @@ final class HealthService: HealthServiceProtocol {
     /// Category types organized by health category.
     /// These represent data with discrete values (e.g., sleep stages).
     private let categoryTypesByCategory: [HealthCategory: [HKCategoryTypeIdentifier]] = [
-        .heart: [
-            .highHeartRateEvent,
-            .lowHeartRateEvent,
-            .irregularHeartRhythmEvent
-        ],
+        .heart: [],
         .sleep: [
             .sleepAnalysis
         ],
