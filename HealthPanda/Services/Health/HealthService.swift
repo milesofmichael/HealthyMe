@@ -8,18 +8,6 @@
 import HealthKit
 import OSLog
 
-/// Categories of health data the app tracks.
-/// Used to organize HealthKit data types and display categories to users.
-enum HealthCategory: String, CaseIterable {
-    case heart = "Heart"
-    case sleep = "Sleep"
-    case mindfulness = "Mindfulness"
-    case body = "Body"
-    case activity = "Activity"
-    case nutrition = "Nutrition"
-    case vitals = "Vitals"
-}
-
 final class HealthService: HealthServiceProtocol {
 
     static let shared = HealthService()
