@@ -52,14 +52,21 @@ final class FoundationModelService: AiServiceProtocol, SummaryServiceProtocol, @
     // MARK: - SummaryServiceProtocol
 
     func generateHeartSummary(comparison: HeartComparison) async throws -> HealthSummary {
+        #if canImport(FoundationModels)
         let prompt = buildHeartPrompt(comparison: comparison)
 
-        #if canImport(FoundationModels)
         let session = LanguageModelSession()
-        let response = try await session.respond(to: prompt)
-        return parseResponse(response.content)
+        let response = try await session.respond(
+            to: prompt,
+            generating: HeartSummaryResponse.self
+        )
+
+        logger.info("Generated heart summary with trend: \(response.content.trend)")
+        return HealthSummary(
+            small: response.content.smallSummary,
+            large: response.content.largeSummary
+        )
         #else
-        // Fallback for devices without Foundation Models
         return generateFallbackSummary(comparison: comparison)
         #endif
     }
@@ -71,7 +78,6 @@ final class FoundationModelService: AiServiceProtocol, SummaryServiceProtocol, @
         lines.append("Analyze this heart health data comparing last month to this month.")
         lines.append("")
 
-        // Current values
         lines.append("This month's averages:")
         if let hr = comparison.current.heartRate {
             lines.append("- Heart rate: \(String(format: "%.0f", hr)) BPM")
@@ -104,32 +110,10 @@ final class FoundationModelService: AiServiceProtocol, SummaryServiceProtocol, @
             lines.append("- HRV: \(change >= 0 ? "+" : "")\(String(format: "%.1f", change))%")
         }
 
-        lines.append("")
-        lines.append("Respond in exactly this format:")
-        lines.append("SMALL: [One sentence, max 50 chars, about the overall trend]")
-        lines.append("LARGE: [2-3 sentences explaining the trends and what they mean for health]")
-
         return lines.joined(separator: "\n")
     }
 
-    private func parseResponse(_ content: String) -> HealthSummary {
-        var small = "Your heart health looks stable"
-        var large = "Your heart metrics are within normal ranges."
-
-        let lines = content.components(separatedBy: "\n")
-        for line in lines {
-            if line.uppercased().hasPrefix("SMALL:") {
-                small = String(line.dropFirst(6)).trimmingCharacters(in: .whitespaces)
-            } else if line.uppercased().hasPrefix("LARGE:") {
-                large = String(line.dropFirst(6)).trimmingCharacters(in: .whitespaces)
-            }
-        }
-
-        return HealthSummary(small: small, large: large)
-    }
-
     private func generateFallbackSummary(comparison: HeartComparison) -> HealthSummary {
-        // Simple fallback when LLM isn't available
         var trend = "stable"
         if let change = comparison.heartRateChange {
             if change > 5 { trend = "slightly elevated" }
