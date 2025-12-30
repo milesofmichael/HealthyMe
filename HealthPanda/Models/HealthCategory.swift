@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-enum HealthCategory: String, CaseIterable {
+enum HealthCategory: String, CaseIterable, Codable, Sendable {
     case heart = "Heart"
     case sleep = "Sleep"
     case mindfulness = "Mindfulness"
@@ -42,7 +42,7 @@ enum HealthCategory: String, CaseIterable {
 
     var subtitle: String {
         switch self {
-        case .heart: return "Heart rate, blood pressure, HRV"
+        case .heart: return "Heart rate, blood oxygen, HRV"
         case .sleep: return "Sleep duration and quality"
         case .mindfulness: return "Mindful minutes, sessions"
         case .body: return "Weight, BMI, body fat"
