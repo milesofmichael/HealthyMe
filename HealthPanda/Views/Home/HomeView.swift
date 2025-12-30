@@ -3,6 +3,8 @@
 //  HealthPanda
 //
 //  Main home screen displaying health category tiles.
+//  Shows all categories regardless of permission status.
+//  Permissions are requested lazily when user opens a category.
 //
 
 import SwiftUI
@@ -11,8 +13,7 @@ struct HomeView: View {
     // Local UI state
     @State private var isLoading = true
     @State private var aiStatus: AiAvailabilityStatus = .available
-    @State private var healthStatus: HealthAuthorizationStatus = .notDetermined
-    @State private var heartSummary: CategorySummary?
+    @State private var summaries: [HealthCategory: CategorySummary] = [:]
     @State private var selectedCategory: HealthCategory?
 
     // Services accessed directly
@@ -36,7 +37,11 @@ struct HomeView: View {
                 await refresh()
             }
             .sheet(item: $selectedCategory) { category in
-                CategoryDetailView(category: category, summary: heartSummary)
+                CategoryDetailView(
+                    category: category,
+                    summary: summaries[category],
+                    healthService: healthService
+                )
             }
         }
         .task {
@@ -59,31 +64,27 @@ struct HomeView: View {
         isLoading = true
         defer { isLoading = false }
 
-        async let ai = aiService.checkAvailability()
-        async let health = healthService.checkAuthorizationStatus()
+        // Check AI status
+        aiStatus = await aiService.checkAvailability()
 
-        aiStatus = await ai
-        healthStatus = await health
-
-        // Load health data regardless of AI status
-        if healthStatus == .authorized {
-            heartSummary = await HealthRepository.shared.getCachedSummary(for: .heart)
-
-            if heartSummary == nil || heartSummary?.isStale == true {
-                heartSummary = await HealthRepository.shared.refreshHeart()
+        // Load cached summaries for all categories
+        for category in HealthCategory.allCases {
+            if let cached = await healthService.getCachedSummary(for: category) {
+                summaries[category] = cached
             }
         }
     }
 
     private func refresh() async {
-        async let ai = aiService.checkAvailability()
-        async let health = healthService.checkAuthorizationStatus()
+        aiStatus = await aiService.checkAvailability()
 
-        aiStatus = await ai
-        healthStatus = await health
-
-        if healthStatus == .authorized {
-            heartSummary = await HealthRepository.shared.refreshHeart()
+        // Only refresh categories that have been previously authorized
+        for category in HealthCategory.allCases {
+            let status = await healthService.checkAuthorizationStatus(for: category)
+            if status == .authorized {
+                let summary = await healthService.refreshCategory(category)
+                summaries[category] = summary
+            }
         }
     }
 
@@ -91,12 +92,12 @@ struct HomeView: View {
 
     private var contentView: some View {
         VStack(spacing: 12) {
-            // System status tiles (errors)
+            // System status tiles (errors that need attention)
             systemStatusTiles
 
-            // Health category tiles (always show if authorized)
-            if healthStatus == .authorized {
-                heartTile
+            // All health category tiles
+            ForEach(HealthCategory.allCases) { category in
+                categoryTile(for: category)
             }
         }
     }
@@ -124,33 +125,22 @@ struct HomeView: View {
             }
         }
 
-        // Health errors
-        if healthStatus == .unavailable {
+        // HealthKit unavailable (device doesn't support it)
+        if !healthService.isHealthDataAvailable {
             ErrorTile(
                 icon: "heart.slash",
                 title: "Health Data Unavailable",
                 subtitle: "This device doesn't support HealthKit"
             )
         }
-
-        if healthStatus == .notDetermined {
-            ErrorTile(
-                icon: "heart.text.clipboard",
-                title: "Health Permissions Needed",
-                subtitle: "Tap to grant access to your health data"
-            ) {
-                Task { await requestHealthPermissions() }
-            }
-        }
     }
 
-    // MARK: - Heart Tile
+    // MARK: - Category Tiles
 
     @ViewBuilder
-    private var heartTile: some View {
-        let category = HealthCategory.heart
-
-        if let summary = heartSummary {
+    private func categoryTile(for category: HealthCategory) -> some View {
+        if let summary = summaries[category] {
+            // We have a summary - show appropriate tile based on status
             switch summary.status {
             case .noData:
                 ErrorTile(
@@ -181,25 +171,19 @@ struct HomeView: View {
                 }
             }
         } else {
-            Tile(
+            // No summary yet - show as needing sync (error state)
+            // This will prompt for permissions when tapped
+            ErrorTile(
                 icon: category.icon,
-                iconColor: category.color,
                 title: category.rawValue,
-                subtitle: "Loading..."
-            )
+                subtitle: "Tap to sync"
+            ) {
+                selectedCategory = category
+            }
         }
     }
 
     // MARK: - Actions
-
-    private func requestHealthPermissions() async {
-        _ = try? await healthService.requestAuthorization()
-        healthStatus = await healthService.checkAuthorizationStatus()
-
-        if healthStatus == .authorized {
-            heartSummary = await HealthRepository.shared.refreshHeart()
-        }
-    }
 
     private func openSettings() {
         if let url = URL(string: UIApplication.openSettingsURLString) {

@@ -11,7 +11,7 @@ import Foundation
 /// Note: HealthKit doesn't expose READ authorization status for privacy.
 /// We track whether authorization has been requested, not whether it was granted.
 enum HealthAuthorizationStatus {
-    /// Authorization has never been requested
+    /// Authorization has never been requested for this category
     case notDetermined
     /// Authorization has been requested (dialog was shown)
     case authorized
@@ -25,11 +25,18 @@ protocol HealthServiceProtocol {
     /// Whether HealthKit is available on this device
     var isHealthDataAvailable: Bool { get }
 
-    /// Request authorization for health data access.
+    /// Request authorization for a specific health category.
+    /// This is called lazily when the user opens a category tile.
     /// Returns true if the request was presented to the user.
-    func requestAuthorization() async throws -> Bool
+    func requestAuthorization(for category: HealthCategory) async throws -> Bool
 
-    /// Check if health authorization has been requested.
+    /// Check if health authorization has been requested for a category.
     /// This queries HealthKit directly, not stored state.
-    func checkAuthorizationStatus() async -> HealthAuthorizationStatus
+    func checkAuthorizationStatus(for category: HealthCategory) async -> HealthAuthorizationStatus
+
+    /// Get cached summary for a category, or nil if not cached.
+    func getCachedSummary(for category: HealthCategory) async -> CategorySummary?
+
+    /// Refresh data for a specific category and generate new summary.
+    func refreshCategory(_ category: HealthCategory) async -> CategorySummary
 }
