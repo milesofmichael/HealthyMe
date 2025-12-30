@@ -6,14 +6,13 @@
 //
 
 import HealthKit
-import OSLog
 
 final class HealthService: HealthServiceProtocol {
 
     static let shared = HealthService()
 
     private let healthStore = HKHealthStore()
-    private let logger = Logger(subsystem: "com.healthpanda", category: "HealthService")
+    private let logger: LoggerServiceProtocol = LoggerService.shared
 
     // MARK: - Health Data Type Definitions
 

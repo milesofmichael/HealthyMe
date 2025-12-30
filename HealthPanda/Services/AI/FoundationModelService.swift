@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import OSLog
 
 #if canImport(FoundationModels)
 import FoundationModels
@@ -16,7 +15,7 @@ final class FoundationModelService: AiServiceProtocol, SummaryServiceProtocol {
 
     static let shared = FoundationModelService()
 
-    private let logger = Logger(subsystem: "com.healthpanda", category: "FoundationModelService")
+    private let logger: LoggerServiceProtocol = LoggerService.shared
 
     // MARK: - AiServiceProtocol
 

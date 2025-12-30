@@ -6,14 +6,13 @@
 //
 
 import HealthKit
-import OSLog
 
 final class HealthFetcher: HealthFetcherProtocol {
 
     static let shared = HealthFetcher()
 
     private let healthStore = HKHealthStore()
-    private let logger = Logger(subsystem: "com.healthpanda", category: "HealthFetcher")
+    private let logger: LoggerServiceProtocol = LoggerService.shared
 
     // Heart rate unit: count/min (beats per minute)
     // Static to avoid compounding on each call

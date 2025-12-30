@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import OSLog
 
 /// Central coordinator for health data operations.
 /// Uses actor isolation to prevent data races during concurrent access.
@@ -17,7 +16,7 @@ actor HealthRepository {
     private let fetcher: HealthFetcherProtocol
     private let summarizer: SummaryServiceProtocol
     private let cache: HealthCacheProtocol
-    private let logger = Logger(subsystem: "com.healthpanda", category: "HealthRepository")
+    private let logger: LoggerServiceProtocol = LoggerService.shared
 
     // In-memory cache for current session
     private var summaries: [HealthCategory: CategorySummary] = [:]

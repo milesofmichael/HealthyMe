@@ -6,14 +6,13 @@
 //
 
 import CoreData
-import OSLog
 
 final class HealthCache: HealthCacheProtocol {
 
     static let shared = HealthCache()
 
     private let container: NSPersistentContainer
-    private let logger = Logger(subsystem: "com.healthpanda", category: "HealthCache")
+    private let logger: LoggerServiceProtocol = LoggerService.shared
 
     init(container: NSPersistentContainer? = nil) {
         self.container = container ?? CoreDataService.shared.container

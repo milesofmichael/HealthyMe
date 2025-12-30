@@ -8,7 +8,6 @@
 //
 
 import CoreData
-import OSLog
 import Combine
 
 final class CoreDataService: DataServiceProtocol, ObservableObject {
@@ -18,7 +17,7 @@ final class CoreDataService: DataServiceProtocol, ObservableObject {
     static let preview = CoreDataService(inMemory: true)
 
     let container: NSPersistentContainer
-    private let logger = Logger(subsystem: "com.healthpanda", category: "CoreDataService")
+    private let logger: LoggerServiceProtocol = LoggerService.shared
 
     @Published private(set) var cachedUserState: UserState?
 
@@ -29,10 +28,9 @@ final class CoreDataService: DataServiceProtocol, ObservableObject {
             container.persistentStoreDescriptions.first?.url = URL(fileURLWithPath: "/dev/null")
         }
 
-        container.loadPersistentStores { _, error in
+        container.loadPersistentStores { [logger] _, error in
             if let error {
-                Logger(subsystem: "com.healthpanda", category: "CoreDataService")
-                    .error("Failed to load store: \(error.localizedDescription)")
+                logger.error("Failed to load store: \(error.localizedDescription)")
             }
         }
 
