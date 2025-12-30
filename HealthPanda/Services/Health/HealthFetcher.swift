@@ -15,12 +15,16 @@ final class HealthFetcher: HealthFetcherProtocol, @unchecked Sendable {
     private let healthStore = HKHealthStore()
     private let logger = Logger(subsystem: "com.healthpanda", category: "HealthFetcher")
 
+    // Heart rate unit: count/min (beats per minute)
+    // Static to avoid compounding on each call
+    private static let bpmUnit = HKUnit.count().unitDivided(by: .minute())
+
     func fetchHeartData(for period: DateInterval) async throws -> HeartData {
         // Fetch all metrics concurrently
-        async let heartRate = fetchAverage(for: .heartRate, unit: .beatsPerMinute(), period: period)
-        async let restingHR = fetchAverage(for: .restingHeartRate, unit: .beatsPerMinute(), period: period)
+        async let heartRate = fetchAverage(for: .heartRate, unit: Self.bpmUnit, period: period)
+        async let restingHR = fetchAverage(for: .restingHeartRate, unit: Self.bpmUnit, period: period)
         async let bloodOxygen = fetchAverage(for: .oxygenSaturation, unit: .percent(), period: period)
-        async let walkingHR = fetchAverage(for: .walkingHeartRateAverage, unit: .beatsPerMinute(), period: period)
+        async let walkingHR = fetchAverage(for: .walkingHeartRateAverage, unit: Self.bpmUnit, period: period)
         async let hrv = fetchAverage(for: .heartRateVariabilitySDNN, unit: .secondUnit(with: .milli), period: period)
 
         return HeartData(

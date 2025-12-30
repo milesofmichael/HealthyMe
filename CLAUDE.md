@@ -22,6 +22,7 @@ features
 AI dev advice
 - use modern approachable 6.2 Swift Concurrency
     - your knowledge cutoff date probably doesn't have this info; search the web for latest concurrency info when creating items where race conditions matter
+    - for example, approachable concurrency means that all our classes are accessed from @MainActor by default, so we do NOT need to annotate our classes (and it will not fix your problems!!!)
 - code should be modular for testability and reusability
     - core components should have a base class (eg. BaseButton -> CheckboxButton)
 - since this is a portfolio project for large tech companies, ensure that it uses data structures in an efficient manner
