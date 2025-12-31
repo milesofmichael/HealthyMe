@@ -79,6 +79,21 @@ struct PerformanceComparison: HealthComparison {
         return parts.joined(separator: " · ")
     }
 
+    var fallbackShortSummary: String {
+        guard let change = stepCountChange else {
+            return "Activity data available"
+        }
+        let absChange = abs(change)
+        switch trend {
+        case .improving:
+            return "Activity up \(absChange.wholeNumber)%"
+        case .declining:
+            return "Activity down \(absChange.wholeNumber)%"
+        case .stable:
+            return "Activity stable"
+        }
+    }
+
     var fallbackSummary: String {
         switch trend {
         case .improving: return "Your activity levels are increasing."

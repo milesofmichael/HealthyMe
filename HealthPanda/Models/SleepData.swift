@@ -86,6 +86,21 @@ struct SleepComparison: HealthComparison {
         return parts.joined(separator: " · ")
     }
 
+    var fallbackShortSummary: String {
+        guard let change = sleepDurationChange else {
+            return "Sleep data available"
+        }
+        let absChange = abs(change)
+        switch trend {
+        case .improving:
+            return "Sleep up \(absChange.wholeNumber)%"
+        case .declining:
+            return "Sleep down \(absChange.wholeNumber)%"
+        case .stable:
+            return "Sleep stable"
+        }
+    }
+
     var fallbackSummary: String {
         switch trend {
         case .improving:

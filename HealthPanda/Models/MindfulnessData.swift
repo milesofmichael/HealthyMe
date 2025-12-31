@@ -71,6 +71,24 @@ struct MindfulnessComparison: HealthComparison {
         return parts.joined(separator: " · ")
     }
 
+    var fallbackShortSummary: String {
+        guard let prev = previous.totalMinutes,
+              let curr = current.totalMinutes,
+              prev > 0 else {
+            return "Mindfulness data available"
+        }
+        let change = ((curr - prev) / prev) * 100
+        let absChange = abs(change)
+        switch trend {
+        case .improving:
+            return "Mindfulness up \(absChange.wholeNumber)%"
+        case .declining:
+            return "Mindfulness down \(absChange.wholeNumber)%"
+        case .stable:
+            return "Mindfulness stable"
+        }
+    }
+
     var fallbackSummary: String {
         switch trend {
         case .improving: return "Your mindfulness practice is growing."

@@ -73,6 +73,10 @@ struct VitalityComparison: HealthComparison {
         return parts.joined(separator: " · ")
     }
 
+    var fallbackShortSummary: String {
+        "Vitals normal"
+    }
+
     var fallbackSummary: String {
         "Your vitals are within normal range."
     }

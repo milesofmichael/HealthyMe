@@ -9,6 +9,7 @@ technologies used
 - Swift Testing for unit tests/XCTest for UI tests
 - Core Data for caching/data persistence
 - on-device Foundation Model API from Apple for LLM integration
+    - LLM code should be reusable just in case I want to add something like Claude API calls in the future
 - Delegates/Protocols for service class creation, for testing and modular purposes
     - the LLM protocol should be seperate and subscribed to by the Foundation Model service class, for future extendability by using API calls like Claude or OpenAI in the future
 
@@ -18,6 +19,10 @@ features
 - home screen has health categories (heart, sleep, mindfulness, etc)
     - clicking on categories will give LLM historical HealthKit data to see if you're trending positive or negative, then display to the user encouragement if they're trending positive, and what they can improve if a vital is trending negative
     - if there's zero data from the categories we tried to pull from, use the LLM to suggest that the user sync their data or give us more permissions to access that specific health information
+    - each category should use teh cache if it's not worth updating the data
+        - monthly = update once a week
+        - weekly = update once every 3 days
+        - daily = update daily
 
 AI dev advice
 - use modern approachable 6.2 Swift Concurrency
