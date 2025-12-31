@@ -2,7 +2,9 @@
 //  FoundationModelService.swift
 //  HealthPanda
 //
-//  Apple Foundation Models implementation. Requires iOS 26+ with Apple Intelligence enabled.
+//  Apple Foundation Models implementation.
+//  Requires iOS 26+ with Apple Intelligence enabled.
+//  Falls back gracefully on older iOS versions.
 //
 
 import Foundation
@@ -20,6 +22,32 @@ final class FoundationModelService: AiServiceProtocol, SummaryServiceProtocol {
     // MARK: - AiServiceProtocol
 
     func checkAvailability() async -> AiAvailabilityStatus {
+        // Runtime check: Foundation Models requires iOS 26+
+        guard #available(iOS 26, *) else {
+            logger.info("iOS 26+ required for Foundation Models")
+            return .unavailableDevice(reason: "Requires iOS 26 or later")
+        }
+
+        return await checkFoundationModelsAvailability()
+    }
+
+    // MARK: - SummaryServiceProtocol
+
+    func generateHeartSummary(comparison: HeartComparison) async throws -> HealthSummary {
+        // Runtime check: Foundation Models requires iOS 26+
+        guard #available(iOS 26, *) else {
+            logger.info("Using fallback summary (iOS 26+ required)")
+            return generateFallbackSummary(comparison: comparison)
+        }
+
+        return try await generateHeartSummaryWithFoundationModels(comparison: comparison)
+    }
+
+    // MARK: - iOS 26+ Implementation
+
+    /// Checks Foundation Models availability on iOS 26+.
+    @available(iOS 26, *)
+    private func checkFoundationModelsAvailability() async -> AiAvailabilityStatus {
         #if canImport(FoundationModels)
         let model = SystemLanguageModel.default
 
@@ -43,14 +71,14 @@ final class FoundationModelService: AiServiceProtocol, SummaryServiceProtocol {
             return .unavailableDevice(reason: "Unknown availability state")
         }
         #else
-        logger.warning("FoundationModels not available")
-        return .unavailableDevice(reason: "This device does not support Apple Intelligence")
+        logger.warning("FoundationModels framework not available in SDK")
+        return .unavailableDevice(reason: "Apple Intelligence not supported")
         #endif
     }
 
-    // MARK: - SummaryServiceProtocol
-
-    func generateHeartSummary(comparison: HeartComparison) async throws -> HealthSummary {
+    /// Generates heart summary using Foundation Models on iOS 26+.
+    @available(iOS 26, *)
+    private func generateHeartSummaryWithFoundationModels(comparison: HeartComparison) async throws -> HealthSummary {
         #if canImport(FoundationModels)
         let prompt = buildHeartPrompt(comparison: comparison)
 
@@ -70,7 +98,7 @@ final class FoundationModelService: AiServiceProtocol, SummaryServiceProtocol {
         #endif
     }
 
-    // MARK: - Private
+    // MARK: - Prompt Building
 
     private func buildHeartPrompt(comparison: HeartComparison) -> String {
         var lines: [String] = []
@@ -112,6 +140,9 @@ final class FoundationModelService: AiServiceProtocol, SummaryServiceProtocol {
         return lines.joined(separator: "\n")
     }
 
+    // MARK: - Fallback Summary
+
+    /// Generates a basic summary without AI for older iOS versions.
     private func generateFallbackSummary(comparison: HeartComparison) -> HealthSummary {
         var trend = "stable"
         if let change = comparison.heartRateChange {

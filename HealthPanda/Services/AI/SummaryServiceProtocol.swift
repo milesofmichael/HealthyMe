@@ -12,6 +12,8 @@ import FoundationModels
 
 /// Structured output for heart health summary.
 /// Uses @Generable for Foundation Models structured generation.
+/// Only available on iOS 26+ where Foundation Models exist.
+@available(iOS 26, *)
 @Generable(description: "A summary of heart health comparing this month to last month")
 struct HeartSummaryResponse {
     @Guide(description: "Brief one-sentence summary for tile display, max 50 characters")
@@ -27,6 +29,7 @@ struct HeartSummaryResponse {
 #endif
 
 /// Result of summary generation.
+/// Works on all iOS versions as a simple data container.
 struct HealthSummary: Sendable {
     /// Short summary for tile display (~50 chars)
     let small: String
