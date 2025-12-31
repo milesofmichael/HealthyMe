@@ -4,8 +4,11 @@
         <attribute name="category" attributeType="String"/>
         <attribute name="largeSummary" attributeType="String"/>
         <attribute name="lastUpdated" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="metricsDisplay" optional="YES" attributeType="String"/>
         <attribute name="smallSummary" attributeType="String"/>
         <attribute name="status" attributeType="String"/>
+        <attribute name="timeSpan" optional="YES" attributeType="String"/>
+        <attribute name="trend" optional="YES" attributeType="String"/>
     </entity>
     <entity name="User" representedClassName="User" syncable="YES" codeGenerationType="class">
         <attribute name="hasCompletedOnboarding" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>

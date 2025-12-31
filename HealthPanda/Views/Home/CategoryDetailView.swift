@@ -18,6 +18,13 @@ struct CategoryDetailView: View {
     @State private var isLoading = false
     @State private var authStatus: HealthAuthorizationStatus = .notDetermined
 
+    // Timespan loading states (uses Dictionary for O(1) lookup)
+    @State private var timespanStates: [TimeSpan: SummaryLoadingState] = [
+        .daily: .idle,
+        .weekly: .idle,
+        .monthly: .idle
+    ]
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -29,7 +36,12 @@ struct CategoryDetailView: View {
                     } else if authStatus == .notDetermined {
                         permissionSection
                     } else {
-                        summarySection
+                        // Show timespan cards for heart category
+                        if category == .heart {
+                            timespanSummariesSection
+                        } else {
+                            summarySection
+                        }
                     }
                 }
                 .padding()
@@ -83,9 +95,25 @@ struct CategoryDetailView: View {
     /// Refresh data from HealthKit and generate new summary.
     private func refreshData() async {
         isLoading = true
-        defer { isLoading = false }
 
         currentSummary = await healthService.refreshCategory(category)
+
+        // Clear main loading state before starting timespan fetches
+        // Timespan cards have their own loading indicators
+        isLoading = false
+
+        // For heart category, fetch timespan summaries concurrently
+        // Each timespan loads independently with streaming UI updates
+        if category == .heart {
+            await fetchTimespanSummaries()
+        }
+    }
+
+    /// Fetches daily, weekly, and monthly summaries concurrently.
+    private func fetchTimespanSummaries() async {
+        await healthService.fetchTimespanSummaries(for: category) { timeSpan, state in
+            timespanStates[timeSpan] = state
+        }
     }
 
     // MARK: - Header
@@ -222,11 +250,29 @@ struct CategoryDetailView: View {
         .background(Color(.secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16))
     }
+
+    // MARK: - Timespan Summaries
+
+    /// Section showing daily, weekly, and monthly health summaries.
+    private var timespanSummariesSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Health Trends")
+                .font(.headline)
+
+            ForEach(TimeSpan.allCases, id: \.self) { timeSpan in
+                HealthSummaryCard(
+                    timeSpan: timeSpan,
+                    loadingState: timespanStates[timeSpan] ?? .idle,
+                    accentColor: category.color
+                )
+            }
+        }
+    }
 }
 
 // MARK: - Previews
 
-#Preview("Ready") {
+#Preview("Heart - Ready") {
     CategoryDetailView(
         category: .heart,
         summary: CategorySummary(
@@ -240,10 +286,24 @@ struct CategoryDetailView: View {
     )
 }
 
-#Preview("No Data") {
+#Preview("Heart - No Data") {
     CategoryDetailView(
         category: .heart,
         summary: CategorySummary.noData(for: .heart),
+        healthService: HealthService.shared
+    )
+}
+
+#Preview("Sleep - Fallback Summary") {
+    CategoryDetailView(
+        category: .sleep,
+        summary: CategorySummary(
+            category: .sleep,
+            status: .ready,
+            smallSummary: "Sleep is improving",
+            largeSummary: "Your sleep patterns have been consistent this week.",
+            lastUpdated: Date()
+        ),
         healthService: HealthService.shared
     )
 }

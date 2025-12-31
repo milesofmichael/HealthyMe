@@ -85,10 +85,107 @@ final class HealthFetcher: HealthFetcherProtocol {
     }
 }
 
+// MARK: - TimeSpan
+
+/// Represents comparison timespan for health summaries.
+/// Each case defines a "current" period and a "previous" period for comparison.
+/// Uses completed periods only (yesterday vs day before, etc.) for more accurate trends.
+enum TimeSpan: String, CaseIterable, Sendable {
+    case daily = "Daily"
+    case weekly = "Weekly"
+    case monthly = "Monthly"
+
+    /// Human-readable description of what's being compared.
+    var comparisonDescription: String {
+        switch self {
+        case .daily: return "Yesterday vs Day Before"
+        case .weekly: return "Last Week vs 2 Weeks Ago"
+        case .monthly: return "Last Month vs 2 Months Ago"
+        }
+    }
+
+    /// SF Symbol icon for this timespan.
+    var icon: String {
+        switch self {
+        case .daily: return "sun.max"
+        case .weekly: return "calendar.badge.clock"
+        case .monthly: return "calendar"
+        }
+    }
+
+    /// Current period for this timespan (uses completed periods for accuracy).
+    var currentPeriod: DateInterval {
+        switch self {
+        case .daily: return .yesterday
+        case .weekly: return .lastWeek
+        case .monthly: return .lastMonth
+        }
+    }
+
+    /// Previous period for comparison.
+    var previousPeriod: DateInterval {
+        switch self {
+        case .daily: return .dayBeforeYesterday
+        case .weekly: return .twoWeeksAgo
+        case .monthly: return .twoMonthsAgo
+        }
+    }
+}
+
 // MARK: - Date Helpers
 
 extension DateInterval {
-    /// Last calendar month
+    /// Yesterday (full day).
+    static var yesterday: DateInterval {
+        let calendar = Calendar.current
+        let now = Date()
+        let startOfToday = calendar.startOfDay(for: now)
+        guard let startOfYesterday = calendar.date(byAdding: .day, value: -1, to: startOfToday) else {
+            return DateInterval(start: now, duration: 0)
+        }
+        return DateInterval(start: startOfYesterday, end: startOfToday)
+    }
+
+    /// Day before yesterday (full day).
+    static var dayBeforeYesterday: DateInterval {
+        let calendar = Calendar.current
+        let now = Date()
+        let startOfToday = calendar.startOfDay(for: now)
+        guard let startOfYesterday = calendar.date(byAdding: .day, value: -1, to: startOfToday),
+              let startOfDayBefore = calendar.date(byAdding: .day, value: -2, to: startOfToday) else {
+            return DateInterval(start: now, duration: 0)
+        }
+        return DateInterval(start: startOfDayBefore, end: startOfYesterday)
+    }
+
+    /// Last week (full week).
+    static var lastWeek: DateInterval {
+        let calendar = Calendar.current
+        let now = Date()
+        guard let startOfThisWeek = calendar.date(
+            from: calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: now)
+        ),
+              let startOfLastWeek = calendar.date(byAdding: .weekOfYear, value: -1, to: startOfThisWeek) else {
+            return DateInterval(start: now, duration: 0)
+        }
+        return DateInterval(start: startOfLastWeek, end: startOfThisWeek)
+    }
+
+    /// Two weeks ago (full week).
+    static var twoWeeksAgo: DateInterval {
+        let calendar = Calendar.current
+        let now = Date()
+        guard let startOfThisWeek = calendar.date(
+            from: calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: now)
+        ),
+              let startOfLastWeek = calendar.date(byAdding: .weekOfYear, value: -1, to: startOfThisWeek),
+              let startOfTwoWeeksAgo = calendar.date(byAdding: .weekOfYear, value: -2, to: startOfThisWeek) else {
+            return DateInterval(start: now, duration: 0)
+        }
+        return DateInterval(start: startOfTwoWeeksAgo, end: startOfLastWeek)
+    }
+
+    /// Last calendar month (full month).
     static var lastMonth: DateInterval {
         let calendar = Calendar.current
         let now = Date()
@@ -99,13 +196,15 @@ extension DateInterval {
         return DateInterval(start: startOfLastMonth, end: startOfThisMonth)
     }
 
-    /// Current calendar month (up to now)
-    static var thisMonth: DateInterval {
+    /// Two months ago (full month).
+    static var twoMonthsAgo: DateInterval {
         let calendar = Calendar.current
         let now = Date()
-        guard let startOfThisMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: now)) else {
+        guard let startOfThisMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: now)),
+              let startOfLastMonth = calendar.date(byAdding: .month, value: -1, to: startOfThisMonth),
+              let startOfTwoMonthsAgo = calendar.date(byAdding: .month, value: -2, to: startOfThisMonth) else {
             return DateInterval(start: now, duration: 0)
         }
-        return DateInterval(start: startOfThisMonth, end: now)
+        return DateInterval(start: startOfTwoMonthsAgo, end: startOfLastMonth)
     }
 }

@@ -2,11 +2,28 @@
 //  HealthCategory.swift
 //  HealthPanda
 //
-//  Health data categories for organizing HealthKit data types.
-//  Limited to 5 focused categories for better user experience.
+//  Health data categories and the protocol for category comparisons.
 //
 
 import SwiftUI
+
+// MARK: - Health Comparison Protocol
+
+/// Protocol for health data comparisons across any category.
+/// Each category's comparison type (HeartComparison, SleepComparison, etc.)
+/// conforms to this and provides all text generation.
+protocol HealthComparison: Sendable {
+    var hasData: Bool { get }
+    var promptText: String { get }
+    var metricsDisplay: String { get }
+    var trend: TrendDirection { get }
+    /// Brief trend summary (~50 chars) when LLM is unavailable
+    var fallbackShortSummary: String { get }
+    /// Detailed summary (1-2 sentences) when LLM is unavailable
+    var fallbackSummary: String { get }
+}
+
+// MARK: - Health Category
 
 enum HealthCategory: String, CaseIterable, Codable, Sendable {
     case heart = "Heart"

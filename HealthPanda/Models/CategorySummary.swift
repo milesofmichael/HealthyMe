@@ -6,15 +6,71 @@
 //
 
 import Foundation
+import SwiftUI
 
 /// Status of data availability for a category.
 enum CategoryStatus: Codable, Sendable {
-    /// No data available at all
     case noData
-    /// Missing critical data (e.g., no heart rate for heart category)
     case missingCritical
-    /// All data available
     case ready
+}
+
+/// Trend direction for health metrics.
+enum TrendDirection: String, Codable, Sendable {
+    case improving
+    case stable
+    case declining
+
+    var icon: String {
+        switch self {
+        case .improving: return "arrow.up.right"
+        case .stable: return "arrow.right"
+        case .declining: return "arrow.down.right"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .improving: return .green
+        case .stable: return .orange
+        case .declining: return .red
+        }
+    }
+}
+
+/// Loading state for async summary fetching.
+enum SummaryLoadingState: Sendable {
+    case idle
+    case loading
+    case loaded(TimespanSummary)
+    case failed
+
+    var summary: TimespanSummary? {
+        if case .loaded(let s) = self { return s }
+        return nil
+    }
+}
+
+/// LLM-generated summary for a specific timespan.
+struct TimespanSummary: Sendable {
+    let timeSpan: TimeSpan
+    let trend: TrendDirection
+    /// Brief trend summary (~50 chars) for home screen tiles
+    let shortSummary: String
+    /// Detailed 1-2 sentence explanation for detail view
+    let summaryText: String
+    /// Formatted metrics from the data model (e.g., "68 BPM avg · 55 resting")
+    let metricsDisplay: String
+
+    static func noData(for timeSpan: TimeSpan) -> TimespanSummary {
+        TimespanSummary(
+            timeSpan: timeSpan,
+            trend: .stable,
+            shortSummary: "No data available",
+            summaryText: "No data available.",
+            metricsDisplay: ""
+        )
+    }
 }
 
 /// LLM-generated summary for a health category.

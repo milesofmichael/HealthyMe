@@ -39,4 +39,12 @@ protocol HealthServiceProtocol {
 
     /// Refresh data for a specific category and generate new summary.
     func refreshCategory(_ category: HealthCategory) async -> CategorySummary
+
+    /// Fetch timespan summaries for a category concurrently.
+    /// Uses TaskGroup to fetch daily, weekly, and monthly data in parallel.
+    /// - Parameter onUpdate: Callback invoked on MainActor for each loaded summary.
+    func fetchTimespanSummaries(
+        for category: HealthCategory,
+        onUpdate: @escaping @MainActor (TimeSpan, SummaryLoadingState) -> Void
+    ) async
 }

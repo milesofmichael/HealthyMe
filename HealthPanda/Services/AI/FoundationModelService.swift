@@ -3,8 +3,7 @@
 //  HealthPanda
 //
 //  Apple Foundation Models implementation.
-//  Requires iOS 26+ with Apple Intelligence enabled.
-//  Falls back gracefully on older iOS versions.
+//  Provides generic summary generation for any health category.
 //
 
 import Foundation
@@ -22,30 +21,32 @@ final class FoundationModelService: AiServiceProtocol, SummaryServiceProtocol {
     // MARK: - AiServiceProtocol
 
     func checkAvailability() async -> AiAvailabilityStatus {
-        // Runtime check: Foundation Models requires iOS 26+
         guard #available(iOS 26, *) else {
-            logger.info("iOS 26+ required for Foundation Models")
             return .unavailableDevice(reason: "Requires iOS 26 or later")
         }
-
         return await checkFoundationModelsAvailability()
     }
 
     // MARK: - SummaryServiceProtocol
 
-    func generateHeartSummary(comparison: HeartComparison) async throws -> HealthSummary {
-        // Runtime check: Foundation Models requires iOS 26+
-        guard #available(iOS 26, *) else {
-            logger.info("Using fallback summary (iOS 26+ required)")
-            return generateFallbackSummary(comparison: comparison)
+    /// Generate summary using comparison's prompt and fallback text.
+    func generateSummary(
+        comparison: any HealthComparison,
+        timeSpan: TimeSpan
+    ) async throws -> TimespanSummary {
+        guard comparison.hasData else {
+            return .noData(for: timeSpan)
         }
 
-        return try await generateHeartSummaryWithFoundationModels(comparison: comparison)
+        guard #available(iOS 26, *) else {
+            return generateFallbackSummary(comparison: comparison, timeSpan: timeSpan)
+        }
+
+        return try await generateWithLLM(comparison: comparison, timeSpan: timeSpan)
     }
 
     // MARK: - iOS 26+ Implementation
 
-    /// Checks Foundation Models availability on iOS 26+.
     @available(iOS 26, *)
     private func checkFoundationModelsAvailability() async -> AiAvailabilityStatus {
         #if canImport(FoundationModels)
@@ -53,113 +54,56 @@ final class FoundationModelService: AiServiceProtocol, SummaryServiceProtocol {
 
         switch model.availability {
         case .available:
-            logger.info("Foundation Models available")
             return .available
-
         case .unavailable(let reason):
             let reasonString = String(describing: reason)
-            logger.warning("Foundation Models unavailable: \(reasonString)")
-
-            if reasonString.lowercased().contains("disabled") ||
-               reasonString.lowercased().contains("not enabled") {
+            if reasonString.lowercased().contains("disabled") {
                 return .disabledByUser
             }
             return .unavailableDevice(reason: reasonString)
-
         @unknown default:
-            logger.error("Unknown availability state")
             return .unavailableDevice(reason: "Unknown availability state")
         }
         #else
-        logger.warning("FoundationModels framework not available in SDK")
         return .unavailableDevice(reason: "Apple Intelligence not supported")
         #endif
     }
 
-    /// Generates heart summary using Foundation Models on iOS 26+.
     @available(iOS 26, *)
-    private func generateHeartSummaryWithFoundationModels(comparison: HeartComparison) async throws -> HealthSummary {
+    private func generateWithLLM(
+        comparison: any HealthComparison,
+        timeSpan: TimeSpan
+    ) async throws -> TimespanSummary {
         #if canImport(FoundationModels)
-        let prompt = buildHeartPrompt(comparison: comparison)
+        let prompt = "\(timeSpan.comparisonDescription)\n\(comparison.promptText)"
 
         let session = LanguageModelSession()
-        let response = try await session.respond(
-            to: prompt,
-            generating: HeartSummaryResponse.self
-        )
+        let response = try await session.respond(to: prompt, generating: LLMSummaryResponse.self)
 
-        logger.info("Generated heart summary with trend: \(response.content.trend)")
-        return HealthSummary(
-            small: response.content.smallSummary,
-            large: response.content.largeSummary
+        return TimespanSummary(
+            timeSpan: timeSpan,
+            trend: comparison.trend,
+            shortSummary: response.content.shortSummary,
+            summaryText: response.content.detailedSummary,
+            metricsDisplay: comparison.metricsDisplay
         )
         #else
-        return generateFallbackSummary(comparison: comparison)
+        return generateFallbackSummary(comparison: comparison, timeSpan: timeSpan)
         #endif
     }
 
-    // MARK: - Prompt Building
+    // MARK: - Fallback
 
-    private func buildHeartPrompt(comparison: HeartComparison) -> String {
-        var lines: [String] = []
-        lines.append("Analyze this heart health data comparing last month to this month.")
-        lines.append("")
-
-        lines.append("This month's averages:")
-        if let hr = comparison.current.heartRate {
-            lines.append("- Heart rate: \(String(format: "%.0f", hr)) BPM")
-        }
-        if let rhr = comparison.current.restingHeartRate {
-            lines.append("- Resting heart rate: \(String(format: "%.0f", rhr)) BPM")
-        }
-        if let o2 = comparison.current.bloodOxygen {
-            lines.append("- Blood oxygen: \(String(format: "%.1f", o2))%")
-        }
-        if let whr = comparison.current.walkingHeartRate {
-            lines.append("- Walking heart rate: \(String(format: "%.0f", whr)) BPM")
-        }
-        if let hrv = comparison.current.hrv {
-            lines.append("- HRV: \(String(format: "%.0f", hrv)) ms")
-        }
-
-        lines.append("")
-        lines.append("Changes from last month:")
-        if let change = comparison.heartRateChange {
-            lines.append("- Heart rate: \(change >= 0 ? "+" : "")\(String(format: "%.1f", change))%")
-        }
-        if let change = comparison.restingHeartRateChange {
-            lines.append("- Resting heart rate: \(change >= 0 ? "+" : "")\(String(format: "%.1f", change))%")
-        }
-        if let change = comparison.bloodOxygenChange {
-            lines.append("- Blood oxygen: \(change >= 0 ? "+" : "")\(String(format: "%.1f", change))%")
-        }
-        if let change = comparison.hrvChange {
-            lines.append("- HRV: \(change >= 0 ? "+" : "")\(String(format: "%.1f", change))%")
-        }
-
-        return lines.joined(separator: "\n")
-    }
-
-    // MARK: - Fallback Summary
-
-    /// Generates a basic summary without AI for older iOS versions.
-    private func generateFallbackSummary(comparison: HeartComparison) -> HealthSummary {
-        var trend = "stable"
-        if let change = comparison.heartRateChange {
-            if change > 5 { trend = "slightly elevated" }
-            else if change < -5 { trend = "improving" }
-        }
-
-        let small = "Heart rate is \(trend)"
-        var large = "Your heart metrics from this month compared to last month show \(trend) patterns. "
-
-        if let hr = comparison.current.heartRate {
-            large += "Average heart rate: \(String(format: "%.0f", hr)) BPM. "
-        }
-        if let rhr = comparison.current.restingHeartRate {
-            large += "Resting heart rate: \(String(format: "%.0f", rhr)) BPM. "
-        }
-
-        return HealthSummary(small: small, large: large)
+    private func generateFallbackSummary(
+        comparison: any HealthComparison,
+        timeSpan: TimeSpan
+    ) -> TimespanSummary {
+        TimespanSummary(
+            timeSpan: timeSpan,
+            trend: comparison.trend,
+            shortSummary: comparison.fallbackShortSummary,
+            summaryText: comparison.fallbackSummary,
+            metricsDisplay: comparison.metricsDisplay
+        )
     }
 }

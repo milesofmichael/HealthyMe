@@ -10,35 +10,32 @@ import Foundation
 #if canImport(FoundationModels)
 import FoundationModels
 
-/// Structured output for heart health summary.
-/// Uses @Generable for Foundation Models structured generation.
-/// Only available on iOS 26+ where Foundation Models exist.
+/// Structured output for LLM summary generation.
+/// Reusable across all health categories.
 @available(iOS 26, *)
-@Generable(description: "A summary of heart health comparing this month to last month")
-struct HeartSummaryResponse {
-    @Guide(description: "Brief one-sentence summary for tile display, max 50 characters")
-    let smallSummary: String
+@Generable(description: "A health summary comparing two time periods")
+struct LLMSummaryResponse {
+    @Guide(description: "Brief one-sentence summary, max 50 characters")
+    let shortSummary: String
 
-    @Guide(description: "Detailed 2-3 sentence explanation of heart health trends and what they mean")
-    let largeSummary: String
-
-    @Guide(description: "Whether heart health is improving, stable, or declining")
-    @Guide(.anyOf(["improving", "stable", "declining"]))
-    let trend: String
+    @Guide(description: "Detailed 1-2 sentence explanation of health trends")
+    let detailedSummary: String
 }
 #endif
 
-/// Result of summary generation.
-/// Works on all iOS versions as a simple data container.
+/// Result of summary generation for home screen tiles.
 struct HealthSummary: Sendable {
-    /// Short summary for tile display (~50 chars)
     let small: String
-    /// Detailed summary for detail view
     let large: String
 }
 
 /// Protocol for AI-powered health summary generation.
+/// Works with any HealthComparison type for reusability across categories.
 protocol SummaryServiceProtocol: Sendable {
-    /// Generate summaries comparing heart data between two periods.
-    func generateHeartSummary(comparison: HeartComparison) async throws -> HealthSummary
+    /// Generate a summary for any health comparison.
+    /// The comparison provides all necessary prompts and fallback text.
+    func generateSummary(
+        comparison: any HealthComparison,
+        timeSpan: TimeSpan
+    ) async throws -> TimespanSummary
 }

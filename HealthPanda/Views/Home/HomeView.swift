@@ -43,6 +43,17 @@ struct HomeView: View {
                     healthService: healthService
                 )
             }
+            .onChange(of: selectedCategory) { oldValue, newValue in
+                // When sheet dismisses (newValue becomes nil), refresh summary from cache
+                // This syncs home tile with any summaries generated in the detail view
+                if newValue == nil, let category = oldValue {
+                    Task {
+                        if let updated = await healthService.getCachedSummary(for: category) {
+                            summaries[category] = updated
+                        }
+                    }
+                }
+            }
         }
         .task {
             await loadInitialState()
