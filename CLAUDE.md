@@ -16,7 +16,7 @@ technologies used
 fetching system design
 - all data is fetched from single function in HealthFetcher when app is loaded
     - this same function should be attached to the refreshcontrol
-- app should then go through each category in background tasks, check the cache update schedule, and call the foundation model if an update is needed
+- app should then go through each category in background tasks, check the cache update schedule, and call the foundation model if an update is needed (if foundation models not enabled, just do the simple update)
     - each update (monthly, daily, weekly) and each category should be a separate background async task
     - come back to the main thread only to update the UI when each task completes 
         - as each task individually completes, update the UI if it's a description on the home page, and update the CategoryDetailView if that category happens to be open at the time of update
