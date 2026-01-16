@@ -25,6 +25,36 @@ fetching system design
     - the data is still updating for that category, in which case, you update that data on the main thread for that category when it's done updating 
         - don't forget to update the cache too in this scenario
 
+categories and metrics checked
+- heart (HKQuantityTypeIdentifier)
+    - heartRate - average heart rate across day/week
+    - walkingHeartRateAverage - heart rate while walking (cardiovascular efficiency)
+    - restingHeartRate - heart rate at rest (lower is generally better for fitness)
+    - heartRateVariabilitySDNN - HRV in milliseconds (higher indicates better recovery/less stress)
+- performance (HKQuantityTypeIdentifier)
+    - stepCount - daily step count (activity level)
+    - distanceWalkingRunning - total distance covered
+    - activeEnergyBurned - calories burned through activity
+    - appleExerciseTime - minutes of exercise meeting Apple's threshold
+    - vo2Max - maximal oxygen consumption (key cardiovascular fitness indicator, ml/kg/min)
+    - walkingSpeed - average walking pace (m/s, mobility indicator)
+    - sixMinuteWalkTestDistance - standardized fitness test distance (if available)
+- vitality (HKQuantityTypeIdentifier)
+    - bodyMass - weight tracking over time
+    - bodyMassIndex - BMI calculated from weight and height
+    - respiratoryRate - breaths per minute (measured during sleep only)
+    - oxygenSaturation - blood oxygen percentage (if Apple Watch has sensor)
+    - appleSleepingWristTemperature - overnight wrist temperature deviation (baseline health)
+- sleep (HKCategoryTypeIdentifier.sleepAnalysis)
+    - total sleep duration - derived from asleep samples (AsleepREM + AsleepCore + AsleepDeep)
+    - sleep stage breakdown - percentage of time in REM, Core (light), and Deep sleep
+    - sleep efficiency - ratio of time asleep vs time in bed (InBed samples)
+    - awakenings count - number of Awake samples during sleep period
+- mindfulness (HKCategoryTypeIdentifier.mindfulSession)
+    - total mindful minutes - sum of all mindful session durations (daily/weekly)
+    - session count - number of mindfulness sessions logged
+    - average session duration - consistency indicator for meditation practice
+
 
 features
 - cute Panda integration in the beautiful and functional UI (follows Apple Human Interface Guidelines)
