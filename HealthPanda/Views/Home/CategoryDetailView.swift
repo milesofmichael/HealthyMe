@@ -5,6 +5,11 @@
 //  Detail view showing full health summary for a category.
 //  Handles lazy permission requests and data fetching.
 //
+//  First Permission Edge Case:
+//  When user opens a category and grants permission for the first time,
+//  we only refresh that single category (not the full monolith refresh).
+//  This is handled by requestPermissionsAndRefresh() -> refreshData() -> refreshCategory().
+//
 
 import SwiftUI
 
@@ -36,12 +41,9 @@ struct CategoryDetailView: View {
                     } else if authStatus == .notDetermined {
                         permissionSection
                     } else {
-                        // Show timespan cards for heart category
-                        if category == .heart {
-                            timespanSummariesSection
-                        } else {
-                            summarySection
-                        }
+                        // Show timespan cards for all categories
+                        // (Non-heart categories will show "not implemented" until fetchers are added)
+                        timespanSummariesSection
                     }
                 }
                 .padding()
@@ -78,38 +80,43 @@ struct CategoryDetailView: View {
     }
 
     /// Request permissions and then refresh data.
+    /// FIRST PERMISSION EDGE CASE: When user grants permission for the first time,
+    /// we only refresh this single category (not the full monolith refresh).
+    /// This provides a faster response for the user who just granted permissions.
     private func requestPermissionsAndRefresh() async {
         isLoading = true
         defer { isLoading = false }
 
-        // Request authorization for this category
+        // Request authorization for this category only
         _ = try? await healthService.requestAuthorization(for: category)
         authStatus = await healthService.checkAuthorizationStatus(for: category)
 
-        // If authorized, fetch data
+        // If authorized, fetch data for this single category
         if authStatus == .authorized {
             await refreshData()
         }
     }
 
     /// Refresh data from HealthKit and generate new summary.
+    /// Only refreshes this single category - does NOT trigger monolith refresh.
     private func refreshData() async {
         isLoading = true
 
+        // refreshCategory() only fetches data for this specific category
         currentSummary = await healthService.refreshCategory(category)
 
         // Clear main loading state before starting timespan fetches
         // Timespan cards have their own loading indicators
         isLoading = false
 
-        // For heart category, fetch timespan summaries concurrently
-        // Each timespan loads independently with streaming UI updates
-        if category == .heart {
-            await fetchTimespanSummaries()
-        }
+        // Fetch timespan summaries concurrently for all categories
+        // Each timespan (daily/weekly/monthly) loads independently with streaming UI updates
+        // Note: Non-implemented categories will return "no data" summaries until fetchers are added
+        await fetchTimespanSummaries()
     }
 
     /// Fetches daily, weekly, and monthly summaries concurrently.
+    /// Uses TaskGroup internally to fetch all three timespans in parallel.
     private func fetchTimespanSummaries() async {
         await healthService.fetchTimespanSummaries(for: category) { timeSpan, state in
             timespanStates[timeSpan] = state

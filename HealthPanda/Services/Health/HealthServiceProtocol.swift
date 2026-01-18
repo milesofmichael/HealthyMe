@@ -38,7 +38,16 @@ protocol HealthServiceProtocol {
     func getCachedSummary(for category: HealthCategory) async -> CategorySummary?
 
     /// Refresh data for a specific category and generate new summary.
+    /// Used for single-category refresh (e.g., first-time permission grant).
     func refreshCategory(_ category: HealthCategory) async -> CategorySummary
+
+    /// Refresh all authorized categories concurrently.
+    /// This is the unified entry point for app launch and pull-to-refresh.
+    /// Shows cached data immediately, then dispatches background tasks for stale data.
+    /// - Parameter onCategoryUpdate: Callback invoked on MainActor as each category completes.
+    func refreshAllCategories(
+        onCategoryUpdate: @escaping @MainActor (HealthCategory, CategorySummary) -> Void
+    ) async
 
     /// Fetch timespan summaries for a category concurrently.
     /// Uses TaskGroup to fetch daily, weekly, and monthly data in parallel.

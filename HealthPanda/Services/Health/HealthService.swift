@@ -5,6 +5,11 @@
 //  Central service for health data operations.
 //  Handles authorization, fetching, summarization, and caching.
 //
+//  Key flows:
+//  1. refreshAllCategories() - Monolith function for app launch and pull-to-refresh
+//  2. refreshCategory() - Single category refresh (used by first-permission edge case)
+//  3. fetchTimespanSummaries() - Concurrent fetch of daily/weekly/monthly for detail view
+//
 
 import HealthKit
 
@@ -22,8 +27,11 @@ actor HealthService: HealthServiceProtocol {
     private let cache: HealthCacheProtocol
     private let logger: LoggerServiceProtocol = LoggerService.shared
 
-    // In-memory cache for current session
+    // In-memory cache for current session (O(1) lookup)
     private var categorySummaries: [HealthCategory: CategorySummary] = [:]
+
+    // Track which categories are currently being refreshed (prevents duplicate work)
+    private var refreshingCategories: Set<HealthCategory> = []
 
     // MARK: - Health Data Type Definitions
 
@@ -148,22 +156,81 @@ actor HealthService: HealthServiceProtocol {
     }
 
     /// Refresh data for a specific category and generate new summary.
+    /// Used for single-category refresh (e.g., first-time permission grant).
     func refreshCategory(_ category: HealthCategory) async -> CategorySummary {
         logger.info("Refreshing \(category.rawValue) data")
 
-        let summary: CategorySummary
-        switch category {
-        case .heart:
-            summary = await refreshCategoryData(for: category, timeSpan: .monthly)
-        case .sleep, .mindfulness, .performance, .vitality:
-            // Placeholder for future implementation
-            logger.info("\(category.rawValue) category not yet implemented")
-            summary = CategorySummary.noData(for: category)
+        // Prevent duplicate refreshes for the same category
+        guard !refreshingCategories.contains(category) else {
+            logger.debug("\(category.rawValue) already refreshing, returning cached")
+            return categorySummaries[category] ?? CategorySummary.noData(for: category)
         }
+        refreshingCategories.insert(category)
+        defer { refreshingCategories.remove(category) }
 
+        let summary = await refreshCategoryData(for: category, timeSpan: .monthly)
         await saveCategorySummary(summary)
         logger.info("Saved summary for \(category.rawValue)")
         return summary
+    }
+
+    /// Refresh all authorized categories concurrently.
+    /// This is the unified entry point for app launch and pull-to-refresh.
+    /// Flow:
+    /// 1. For each category, check authorization
+    /// 2. If authorized, immediately return cached summary (fast UI)
+    /// 3. Then check if cache is stale; if so, fetch fresh data in background
+    /// 4. Update UI via callback as each category completes
+    func refreshAllCategories(
+        onCategoryUpdate: @escaping @MainActor (HealthCategory, CategorySummary) -> Void
+    ) async {
+        logger.info("Starting monolith refresh for all categories")
+
+        await withTaskGroup(of: Void.self) { group in
+            for category in HealthCategory.allCases {
+                group.addTask {
+                    await self.refreshSingleCategoryWithCallback(
+                        category,
+                        onUpdate: onCategoryUpdate
+                    )
+                }
+            }
+        }
+
+        logger.info("Completed monolith refresh for all categories")
+    }
+
+    /// Refresh a single category: show cached first, then refresh if stale.
+    private func refreshSingleCategoryWithCallback(
+        _ category: HealthCategory,
+        onUpdate: @escaping @MainActor (HealthCategory, CategorySummary) -> Void
+    ) async {
+        // Step 1: Check authorization
+        let authStatus = await checkAuthorizationStatus(for: category)
+        guard authStatus == .authorized else {
+            logger.debug("\(category.rawValue) not authorized, skipping")
+            return
+        }
+
+        // Step 2: Show cached summary immediately (fast perceived startup)
+        if let cached = await getCachedSummary(for: category) {
+            await MainActor.run { onUpdate(category, cached) }
+        }
+
+        // Step 3: Check if any timespan needs refresh
+        let needsDaily = await cache.needsRefresh(for: category, timeSpan: .daily)
+        let needsWeekly = await cache.needsRefresh(for: category, timeSpan: .weekly)
+        let needsMonthly = await cache.needsRefresh(for: category, timeSpan: .monthly)
+
+        guard needsDaily || needsWeekly || needsMonthly else {
+            logger.debug("\(category.rawValue) cache is fresh, no refresh needed")
+            return
+        }
+
+        // Step 4: Refresh stale data
+        logger.info("\(category.rawValue) has stale data, refreshing...")
+        let summary = await refreshCategory(category)
+        await MainActor.run { onUpdate(category, summary) }
     }
 
     /// Fetch timespan summaries for a category concurrently.
@@ -240,6 +307,7 @@ actor HealthService: HealthServiceProtocol {
 
     /// Fetches comparison data for a category and timespan.
     /// Fetches current and previous periods concurrently for efficiency.
+    /// Heart is fully implemented; other categories return stub data with TODO markers.
     private func fetchComparison(
         for category: HealthCategory,
         timeSpan: TimeSpan
@@ -251,14 +319,35 @@ actor HealthService: HealthServiceProtocol {
             async let previous = fetcher.fetchHeartData(for: timeSpan.previousPeriod)
             return HeartComparison(previous: try await previous, current: try await current)
 
-        case .sleep, .mindfulness, .performance, .vitality:
-            // Future: Add fetchers for other categories
-            throw HealthServiceError.categoryNotImplemented
+        case .sleep:
+            // TODO: Implement sleep data fetching in HealthFetcher
+            async let current = fetcher.fetchSleepData(for: timeSpan.currentPeriod)
+            async let previous = fetcher.fetchSleepData(for: timeSpan.previousPeriod)
+            return SleepComparison(previous: try await previous, current: try await current)
+
+        case .performance:
+            // TODO: Implement performance data fetching in HealthFetcher
+            async let current = fetcher.fetchPerformanceData(for: timeSpan.currentPeriod)
+            async let previous = fetcher.fetchPerformanceData(for: timeSpan.previousPeriod)
+            return PerformanceComparison(previous: try await previous, current: try await current)
+
+        case .vitality:
+            // TODO: Implement vitality data fetching in HealthFetcher
+            async let current = fetcher.fetchVitalityData(for: timeSpan.currentPeriod)
+            async let previous = fetcher.fetchVitalityData(for: timeSpan.previousPeriod)
+            return VitalityComparison(previous: try await previous, current: try await current)
+
+        case .mindfulness:
+            // TODO: Implement mindfulness data fetching in HealthFetcher
+            async let current = fetcher.fetchMindfulnessData(for: timeSpan.currentPeriod)
+            async let previous = fetcher.fetchMindfulnessData(for: timeSpan.previousPeriod)
+            return MindfulnessComparison(previous: try await previous, current: try await current)
         }
     }
 
     /// Refresh category data for home screen tile display.
     /// Uses the LLM-generated shortSummary for the tile instead of just metrics.
+    /// Fetches all three timespans (daily, weekly, monthly) and uses monthly for tile.
     private func refreshCategoryData(
         for category: HealthCategory,
         timeSpan: TimeSpan
@@ -279,7 +368,7 @@ actor HealthService: HealthServiceProtocol {
             // Cache the timespan summary for reuse in detail view
             await cache.saveTimespanSummary(timespanSummary, for: category)
 
-            logger.info("Generated \(category.rawValue) summary successfully")
+            logger.info("Generated \(category.rawValue) \(timeSpan.rawValue) summary successfully")
             return CategorySummary(
                 category: category,
                 status: .ready,
@@ -287,6 +376,10 @@ actor HealthService: HealthServiceProtocol {
                 largeSummary: timespanSummary.summaryText,
                 lastUpdated: Date()
             )
+        } catch HealthServiceError.categoryNotImplemented {
+            // Category not yet implemented - return placeholder
+            logger.info("\(category.rawValue) category not yet implemented")
+            return CategorySummary.noData(for: category)
         } catch {
             logger.error("Failed to refresh \(category.rawValue): \(error.localizedDescription)")
             return categorySummaries[category] ?? CategorySummary.noData(for: category)

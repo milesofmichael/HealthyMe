@@ -3,6 +3,7 @@
 //  HealthPanda
 //
 //  Fetches health data from HealthKit.
+//  Heart category is fully implemented; other categories have stub implementations.
 //
 
 import HealthKit
@@ -14,12 +15,20 @@ final class HealthFetcher: HealthFetcherProtocol {
     private let healthStore = HKHealthStore()
     private let logger: LoggerServiceProtocol = LoggerService.shared
 
-    // Heart rate unit: count/min (beats per minute)
-    // Static to avoid compounding on each call
+    // MARK: - Units (static to avoid recreating)
+
     private static let bpmUnit = HKUnit.count().unitDivided(by: .minute())
+    private static let countUnit = HKUnit.count()
+    private static let meterUnit = HKUnit.meter()
+    private static let calorieUnit = HKUnit.kilocalorie()
+    private static let minuteUnit = HKUnit.minute()
+
+    // MARK: - Heart (Implemented)
 
     func fetchHeartData(for period: DateInterval) async throws -> HeartData {
-        // Fetch all metrics concurrently
+        logger.debug("Fetching heart data for \(period.start) to \(period.end)")
+
+        // Fetch all heart metrics concurrently for optimal performance
         async let heartRate = fetchAverage(for: .heartRate, unit: Self.bpmUnit, period: period)
         async let restingHR = fetchAverage(for: .restingHeartRate, unit: Self.bpmUnit, period: period)
         async let walkingHR = fetchAverage(for: .walkingHeartRateAverage, unit: Self.bpmUnit, period: period)
@@ -34,7 +43,64 @@ final class HealthFetcher: HealthFetcherProtocol {
         )
     }
 
-    // MARK: - Private
+    // MARK: - Sleep (Stub)
+
+    func fetchSleepData(for period: DateInterval) async throws -> SleepData {
+        // TODO: Implement sleep data fetching
+        // 1. Query HKCategoryTypeIdentifier.sleepAnalysis
+        // 2. Filter samples by HKCategoryValueSleepAnalysis cases:
+        //    - .asleepREM, .asleepCore, .asleepDeep for sleep stages
+        //    - .inBed for total time in bed
+        //    - .awake for awakenings
+        // 3. Sum durations for each stage
+        // 4. Calculate sleep efficiency: (total asleep / time in bed) * 100
+        logger.warning("Sleep data fetching not yet implemented")
+        return SleepData.empty(for: period)
+    }
+
+    // MARK: - Performance (Stub)
+
+    func fetchPerformanceData(for period: DateInterval) async throws -> PerformanceData {
+        // TODO: Implement performance data fetching
+        // Use fetchSum() for cumulative metrics, fetchAverage() for rates
+        // Metrics to implement:
+        // - stepCount: fetchSum(for: .stepCount, unit: .count())
+        // - distanceWalkingRunning: fetchSum(for: .distanceWalkingRunning, unit: .meter())
+        // - activeEnergyBurned: fetchSum(for: .activeEnergyBurned, unit: .kilocalorie())
+        // - appleExerciseTime: fetchSum(for: .appleExerciseTime, unit: .minute())
+        // - vo2Max: fetchAverage(for: .vo2Max, unit: ml/(kg·min))
+        // - walkingSpeed: fetchAverage(for: .walkingSpeed, unit: m/s)
+        logger.warning("Performance data fetching not yet implemented")
+        return PerformanceData.empty(for: period)
+    }
+
+    // MARK: - Vitality (Stub)
+
+    func fetchVitalityData(for period: DateInterval) async throws -> VitalityData {
+        // TODO: Implement vitality data fetching
+        // Metrics to implement:
+        // - bodyMass: fetchAverage(for: .bodyMass, unit: .pound() or .gramUnit(with: .kilo))
+        // - bodyMassIndex: fetchAverage(for: .bodyMassIndex, unit: .count())
+        // - respiratoryRate: fetchAverage(for: .respiratoryRate, unit: .count().unitDivided(by: .minute()))
+        // - oxygenSaturation: fetchAverage(for: .oxygenSaturation, unit: .percent())
+        // - appleSleepingWristTemperature: fetchAverage(for: .appleSleepingWristTemperature, unit: .degreeCelsius())
+        logger.warning("Vitality data fetching not yet implemented")
+        return VitalityData.empty(for: period)
+    }
+
+    // MARK: - Mindfulness (Stub)
+
+    func fetchMindfulnessData(for period: DateInterval) async throws -> MindfulnessData {
+        // TODO: Implement mindfulness data fetching
+        // 1. Query HKCategoryTypeIdentifier.mindfulSession
+        // 2. Count number of sessions in period
+        // 3. Sum duration of all sessions
+        // 4. Calculate average session duration
+        logger.warning("Mindfulness data fetching not yet implemented")
+        return MindfulnessData.empty(for: period)
+    }
+
+    // MARK: - Private Helpers
 
     /// Fetches the average value for a quantity type over a period.
     /// Returns nil if no samples exist.

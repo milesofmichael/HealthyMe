@@ -6,6 +6,10 @@
 //  Shows all categories regardless of permission status.
 //  Permissions are requested lazily when user opens a category.
 //
+//  Entry Points:
+//  - App launch (.task) and pull-to-refresh (.refreshable) both call refresh()
+//  - This unified approach shows cached data immediately, then updates stale data
+//
 
 import SwiftUI
 
@@ -57,7 +61,8 @@ struct HomeView: View {
             }
         }
         .task {
-            await loadInitialState()
+            // App launch: use unified refresh flow
+            await refresh()
         }
     }
 
@@ -72,50 +77,37 @@ struct HomeView: View {
         .frame(maxWidth: .infinity, minHeight: 200)
     }
 
-    private func loadInitialState() async {
-        isLoading = true
-        defer { isLoading = false }
-
-        // Check AI status
-        aiStatus = await aiService.checkAvailability()
-
-        // Load cached summaries for all categories
-        for category in HealthCategory.allCases {
-            if let cached = await healthService.getCachedSummary(for: category) {
-                summaries[category] = cached
-            }
-        }
-    }
-
+    /// Unified refresh function for both app launch and pull-to-refresh.
+    /// Flow:
+    /// 1. Guard against concurrent refreshes
+    /// 2. Check AI availability
+    /// 3. Call monolith refresh which:
+    ///    - Shows cached data immediately (fast perceived startup)
+    ///    - Dispatches background tasks for stale data
+    ///    - Updates UI progressively as each category completes
     private func refresh() async {
         // Guard against concurrent refreshes to prevent race conditions
         guard !isRefreshing else { return }
         isRefreshing = true
-        defer { isRefreshing = false }
 
+        // Show loading only on initial load (when no summaries exist yet)
+        let isInitialLoad = summaries.isEmpty
+        if isInitialLoad {
+            isLoading = true
+        }
+
+        // Check AI status
         aiStatus = await aiService.checkAvailability()
 
-        // Refresh authorized categories concurrently using TaskGroup
-        // This prevents sequential blocking and reduces total refresh time
-        await withTaskGroup(of: (HealthCategory, CategorySummary?).self) { group in
-            for category in HealthCategory.allCases {
-                group.addTask {
-                    let status = await self.healthService.checkAuthorizationStatus(for: category)
-                    if status == .authorized {
-                        let summary = await self.healthService.refreshCategory(category)
-                        return (category, summary)
-                    }
-                    return (category, nil)
-                }
-            }
-
-            // Collect results as they complete
-            for await (category, summary) in group {
-                if let summary {
-                    summaries[category] = summary
-                }
-            }
+        // Use the unified monolith refresh from HealthService
+        // This shows cached data immediately, then refreshes stale data in background
+        await healthService.refreshAllCategories { category, summary in
+            // This callback is invoked on MainActor as each category completes
+            summaries[category] = summary
         }
+
+        isLoading = false
+        isRefreshing = false
     }
 
     // MARK: - Content

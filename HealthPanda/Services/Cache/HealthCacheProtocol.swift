@@ -3,6 +3,7 @@
 //  HealthPanda
 //
 //  Protocol for caching health summaries by category and timespan.
+//  Implements staleness rules: daily=24h, weekly=72h, monthly=168h (1 week).
 //
 
 import Foundation
@@ -15,11 +16,19 @@ protocol HealthCacheProtocol: Sendable {
     /// Save a category summary to the cache.
     func saveSummary(_ summary: CategorySummary) async
 
-    /// Get a cached timespan summary (for detail view cards).
+    /// Get a cached timespan summary if it's still fresh according to staleness rules.
+    /// Returns nil if no cache exists OR if cached data is stale.
+    /// Staleness rules:
+    /// - Daily: stale after 24 hours
+    /// - Weekly: stale after 72 hours (3 days)
+    /// - Monthly: stale after 168 hours (1 week)
     func getTimespanSummary(
         for category: HealthCategory,
         timeSpan: TimeSpan
     ) async -> TimespanSummary?
+
+    /// Check if a timespan summary needs refreshing (is stale or missing).
+    func needsRefresh(for category: HealthCategory, timeSpan: TimeSpan) async -> Bool
 
     /// Save a timespan summary to the cache.
     func saveTimespanSummary(
