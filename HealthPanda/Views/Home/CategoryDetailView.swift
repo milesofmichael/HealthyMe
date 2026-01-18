@@ -65,58 +65,42 @@ struct CategoryDetailView: View {
 
     // MARK: - Data Loading
 
-    /// Load data for this category, requesting permissions if needed.
+    /// Load data for this category.
+    /// STEP 1: Show cached data IMMEDIATELY (category summary + timespan cards)
+    /// STEP 2: Background refresh if stale
     private func loadData() async {
-        // Use passed summary if available
+        // Show passed summary immediately
         currentSummary = summary
 
-        // Check authorization status for this category
+        // Check auth status
         authStatus = await healthService.checkAuthorizationStatus(for: category)
+        guard authStatus == .authorized else { return }
 
-        // If already authorized, refresh data
-        if authStatus == .authorized {
-            await refreshData()
+        // STEP 1: Load cached timespan data IMMEDIATELY (before any refresh)
+        await fetchTimespanSummaries()
+
+        // STEP 2: Background refresh category summary if needed
+        if currentSummary == nil {
+            currentSummary = await healthService.refreshCategory(category)
         }
     }
 
-    /// Request permissions and then refresh data.
-    /// FIRST PERMISSION EDGE CASE: When user grants permission for the first time,
-    /// we only refresh this single category (not the full monolith refresh).
-    /// This provides a faster response for the user who just granted permissions.
+    /// First-time permission grant - fetch single category only.
     private func requestPermissionsAndRefresh() async {
         isLoading = true
         defer { isLoading = false }
 
-        // Request authorization for this category only
         _ = try? await healthService.requestAuthorization(for: category)
         authStatus = await healthService.checkAuthorizationStatus(for: category)
 
-        // If authorized, fetch data for this single category
         if authStatus == .authorized {
-            await refreshData()
+            // First time - no cache, need to fetch everything
+            currentSummary = await healthService.refreshCategory(category)
+            await fetchTimespanSummaries()
         }
     }
 
-    /// Refresh data from HealthKit and generate new summary.
-    /// Only refreshes this single category - does NOT trigger monolith refresh.
-    private func refreshData() async {
-        isLoading = true
-
-        // refreshCategory() only fetches data for this specific category
-        currentSummary = await healthService.refreshCategory(category)
-
-        // Clear main loading state before starting timespan fetches
-        // Timespan cards have their own loading indicators
-        isLoading = false
-
-        // Fetch timespan summaries concurrently for all categories
-        // Each timespan (daily/weekly/monthly) loads independently with streaming UI updates
-        // Note: Non-implemented categories will return "no data" summaries until fetchers are added
-        await fetchTimespanSummaries()
-    }
-
-    /// Fetches daily, weekly, and monthly summaries concurrently.
-    /// Uses TaskGroup internally to fetch all three timespans in parallel.
+    /// Load cached timespan data immediately, refresh stale data in background.
     private func fetchTimespanSummaries() async {
         await healthService.fetchTimespanSummaries(for: category) { timeSpan, state in
             timespanStates[timeSpan] = state

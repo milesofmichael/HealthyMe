@@ -157,7 +157,58 @@ flowchart TB
 
 1. **Unified entry point**: App launch and pull-to-refresh use the same `refresh()` function
 2. **isRefreshing guard**: Prevents concurrent refresh races
-3. **Cache-first**: Always check cache before fetching - fast perceived startup
+3. **Cache-first, no loading spinner**: Show cached data IMMEDIATELY - never show loading if cache exists
 4. **Progressive UI**: Each category updates independently as it completes
 5. **Actor isolation**: `HealthService` is an actor, `HealthCache` uses Core Data context for thread safety
 6. **First permission edge case**: Only refreshes the single category, not the full monolith
+
+## CategoryDetailView Caching Flow
+
+```mermaid
+flowchart TB
+    subgraph CategoryOpen["User Opens Category"]
+        Open["CategoryDetailView.loadData()"]
+        HasSummary{"summary != nil?"}
+        ShowSummary["Show summary INSTANTLY"]
+        ShowMainLoading["Show loading spinner"]
+    end
+
+    subgraph TimespanFetch["fetchTimespanSummaries() - Per Timespan"]
+        CheckCache{"Cache exists?<br/>(ignore staleness)"}
+        ShowCached["Show cached card INSTANTLY"]
+        ShowCardLoading["Show 'Analyzing...'"]
+        CheckStale{"Cache stale?"}
+        Done["Done - no refresh needed"]
+        BackgroundFetch["Background: fetch + AI"]
+        SilentUpdate["Silently update card"]
+    end
+
+    Open --> HasSummary
+    HasSummary -->|Yes| ShowSummary
+    HasSummary -->|No| ShowMainLoading
+    ShowSummary --> CheckCache
+    ShowMainLoading --> CheckCache
+
+    CheckCache -->|Yes| ShowCached
+    CheckCache -->|No| ShowCardLoading
+    ShowCached --> CheckStale
+    ShowCardLoading --> BackgroundFetch
+
+    CheckStale -->|No| Done
+    CheckStale -->|Yes| BackgroundFetch
+    BackgroundFetch --> SilentUpdate
+
+    classDef instant fill:#81C784,stroke:#2E7D32,stroke-width:2px,color:#000
+    classDef loading fill:#FFF176,stroke:#F9A825,stroke-width:2px,color:#000
+    classDef background fill:#7986CB,stroke:#303F9F,stroke-width:2px,color:#000
+
+    class ShowSummary,ShowCached,Done instant
+    class ShowMainLoading,ShowCardLoading loading
+    class BackgroundFetch,SilentUpdate background
+```
+
+**Critical Rules**:
+1. **Main loading spinner**: ONLY if `summary == nil` (literally no cache exists)
+2. **Card "Analyzing..."**: ONLY if `cache.getTimespanSummary() == nil` (literally no cache)
+3. **Cache exists (even stale)** → show it INSTANTLY, then silently refresh in background
+4. User should NEVER see loading/analyzing if ANY cached data exists

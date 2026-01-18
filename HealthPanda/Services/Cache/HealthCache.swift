@@ -205,19 +205,13 @@ final class HealthCache: HealthCacheProtocol {
         )
     }
 
+    /// Maps Core Data entity to TimespanSummary for DISPLAY.
+    /// Does NOT check staleness - always returns data if it exists.
+    /// Staleness is checked separately via needsRefresh() for background updates.
     private func mapToTimespanSummary(_ cached: CachedSummary, timeSpan: TimeSpan) -> TimespanSummary? {
         guard let shortSummary = cached.smallSummary,
               let summaryText = cached.largeSummary,
-              let trendString = cached.trend,
-              let lastUpdated = cached.lastUpdated else {
-            return nil
-        }
-
-        // Check staleness using timespan-specific rules
-        let age = Date().timeIntervalSince(lastUpdated)
-        let maxAllowedAge = maxAge(for: timeSpan)
-        if age > maxAllowedAge {
-            logger.debug("Cache stale for \(timeSpan.rawValue): age \(Int(age/3600))h > max \(Int(maxAllowedAge/3600))h")
+              let trendString = cached.trend else {
             return nil
         }
 

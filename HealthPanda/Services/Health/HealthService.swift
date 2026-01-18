@@ -233,54 +233,50 @@ actor HealthService: HealthServiceProtocol {
         await MainActor.run { onUpdate(category, summary) }
     }
 
-    /// Fetch timespan summaries for a category concurrently.
-    /// Uses TaskGroup to fetch daily, weekly, and monthly data in parallel.
-    /// Results stream back to UI as they complete for progressive loading.
+    /// Fetch timespan summaries for a category.
+    /// STEP 1: Show cached data immediately (even if stale)
+    /// STEP 2: Background refresh stale/missing data, silently update UI
     func fetchTimespanSummaries(
         for category: HealthCategory,
         onUpdate: @escaping @MainActor (TimeSpan, SummaryLoadingState) -> Void
     ) async {
-        logger.info("Fetching \(category.rawValue) timespan summaries concurrently")
+        var toRefresh: [TimeSpan] = []
 
-        // Signal loading for all timespans upfront
+        // STEP 1: Show cached data immediately
         for timeSpan in TimeSpan.allCases {
-            await MainActor.run { onUpdate(timeSpan, .loading) }
+            if let cached = await cache.getTimespanSummary(for: category, timeSpan: timeSpan) {
+                await MainActor.run { onUpdate(timeSpan, .loaded(cached)) }
+                if await cache.needsRefresh(for: category, timeSpan: timeSpan) {
+                    toRefresh.append(timeSpan)
+                }
+            } else {
+                await MainActor.run { onUpdate(timeSpan, .loading) }
+                toRefresh.append(timeSpan)
+            }
         }
 
-        // Fetch all timespans concurrently using TaskGroup
-        // O(n) where n = number of timespans (3), runs in parallel
+        // STEP 2: Background refresh stale/missing data
+        guard !toRefresh.isEmpty else { return }
+
         await withTaskGroup(of: (TimeSpan, SummaryLoadingState).self) { group in
-            for timeSpan in TimeSpan.allCases {
+            for timeSpan in toRefresh {
                 group.addTask {
                     await self.fetchSingleTimespan(category: category, timeSpan: timeSpan)
                 }
             }
-
-            // Stream results to main thread as they complete
             for await (timeSpan, state) in group {
                 await MainActor.run { onUpdate(timeSpan, state) }
             }
         }
-
-        logger.info("Completed all \(category.rawValue) timespan summaries")
     }
 
     // MARK: - Private - Data Fetching
 
-    /// Fetches data for a single timespan and generates summary.
-    /// Checks cache first for O(1) retrieval when available.
+    /// Fetches fresh data for a single timespan (called only when cache is stale/missing).
     private func fetchSingleTimespan(
         category: HealthCategory,
         timeSpan: TimeSpan
     ) async -> (TimeSpan, SummaryLoadingState) {
-        // Check cache first for fast retrieval (includes persisted metricTrends)
-        if let cached = await cache.getTimespanSummary(for: category, timeSpan: timeSpan) {
-            logger.debug("Cache hit for \(category.rawValue) \(timeSpan.rawValue)")
-            return (timeSpan, .loaded(cached))
-        }
-
-        logger.debug("Cache miss, fetching \(category.rawValue) \(timeSpan.rawValue) from HealthKit")
-
         do {
             let comparison = try await fetchComparison(for: category, timeSpan: timeSpan)
 
