@@ -40,10 +40,11 @@ actor HealthService: HealthServiceProtocol {
                  .walkingHeartRateAverage, .heartRateVariabilitySDNN],
         .sleep: [],
         .mindfulness: [],
-        .performance: [.stepCount, .distanceWalkingRunning, .distanceCycling,
-                       .activeEnergyBurned, .appleExerciseTime],
-        .vitality: [.bodyTemperature, .respiratoryRate,
-                    .bloodPressureSystolic, .bloodPressureDiastolic]
+        .performance: [.stepCount, .distanceWalkingRunning, .activeEnergyBurned,
+                       .appleExerciseTime, .vo2Max, .walkingSpeed,
+                       .sixMinuteWalkTestDistance],
+        .vitality: [.bodyMass, .bodyMassIndex, .respiratoryRate,
+                    .oxygenSaturation, .appleSleepingWristTemperature]
     ]
 
     private let categoryTypesByCategory: [HealthCategory: [HKCategoryTypeIdentifier]] = [

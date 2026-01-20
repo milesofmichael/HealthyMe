@@ -207,7 +207,7 @@ final class HealthFetcher: HealthFetcherProtocol {
     // MARK: - Private Helpers
 
     /// Fetches the average value for a quantity type over a period.
-    /// Returns nil if no samples exist.
+    /// Returns nil if no samples exist (treats "no data" errors as nil, not failures).
     private func fetchAverage(
         for identifier: HKQuantityTypeIdentifier,
         unit: HKUnit,
@@ -232,6 +232,14 @@ final class HealthFetcher: HealthFetcherProtocol {
                 options: .discreteAverage
             ) { _, statistics, error in
                 if let error {
+                    // HealthKit returns "No data available" as an error (code 11) - treat as nil, not failure
+                    // This is normal when user doesn't have data for a metric
+                    let nsError = error as NSError
+                    if nsError.code == 11 || error.localizedDescription.contains("No data available") {
+                        self.logger.debug("No data for \(identifier.rawValue) in period")
+                        continuation.resume(returning: nil)
+                        return
+                    }
                     self.logger.error("Stats query failed for \(identifier.rawValue): \(error.localizedDescription)")
                     continuation.resume(throwing: error)
                     return
@@ -254,6 +262,7 @@ final class HealthFetcher: HealthFetcherProtocol {
 
     /// Fetches the sum of values for a quantity type over a period.
     /// Used for cumulative metrics like steps, distance, calories.
+    /// Returns nil if no samples exist (treats "no data" errors as nil, not failures).
     private func fetchSum(
         for identifier: HKQuantityTypeIdentifier,
         unit: HKUnit,
@@ -277,6 +286,14 @@ final class HealthFetcher: HealthFetcherProtocol {
                 options: .cumulativeSum
             ) { _, statistics, error in
                 if let error {
+                    // HealthKit returns "No data available" as an error (code 11) - treat as nil, not failure
+                    // This is normal when user doesn't have data for a metric
+                    let nsError = error as NSError
+                    if nsError.code == 11 || error.localizedDescription.contains("No data available") {
+                        self.logger.debug("No data for \(identifier.rawValue) in period")
+                        continuation.resume(returning: nil)
+                        return
+                    }
                     self.logger.error("Sum query failed for \(identifier.rawValue): \(error.localizedDescription)")
                     continuation.resume(throwing: error)
                     return
@@ -339,8 +356,8 @@ enum TimeSpan: String, CaseIterable, Sendable {
     var comparisonDescription: String {
         switch self {
         case .daily: return "Yesterday vs Day Before"
-        case .weekly: return "Last Week vs 2 Weeks Ago"
-        case .monthly: return "Last Month vs 2 Months Ago"
+        case .weekly: return "Last 7 Days vs Prior 7 Days"
+        case .monthly: return "Last 30 Days vs Prior 30 Days"
         }
     }
 
@@ -398,53 +415,52 @@ extension DateInterval {
         return DateInterval(start: startOfDayBefore, end: startOfYesterday)
     }
 
-    /// Last week (full week).
+    /// Last 7 days ending yesterday (e.g., if today is Jan 30, returns Jan 23-29).
     static var lastWeek: DateInterval {
         let calendar = Calendar.current
         let now = Date()
-        guard let startOfThisWeek = calendar.date(
-            from: calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: now)
-        ),
-              let startOfLastWeek = calendar.date(byAdding: .weekOfYear, value: -1, to: startOfThisWeek) else {
+        let startOfToday = calendar.startOfDay(for: now)
+        // End is start of today (exclusive), so effectively ends at midnight yesterday
+        guard let weekStart = calendar.date(byAdding: .day, value: -7, to: startOfToday) else {
             return DateInterval(start: now, duration: 0)
         }
-        return DateInterval(start: startOfLastWeek, end: startOfThisWeek)
+        return DateInterval(start: weekStart, end: startOfToday)
     }
 
-    /// Two weeks ago (full week).
+    /// 7 days before lastWeek (e.g., if today is Jan 30, returns Jan 16-22).
+    /// No overlap with lastWeek.
     static var twoWeeksAgo: DateInterval {
         let calendar = Calendar.current
         let now = Date()
-        guard let startOfThisWeek = calendar.date(
-            from: calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: now)
-        ),
-              let startOfLastWeek = calendar.date(byAdding: .weekOfYear, value: -1, to: startOfThisWeek),
-              let startOfTwoWeeksAgo = calendar.date(byAdding: .weekOfYear, value: -2, to: startOfThisWeek) else {
+        let startOfToday = calendar.startOfDay(for: now)
+        guard let weekStart = calendar.date(byAdding: .day, value: -7, to: startOfToday),
+              let twoWeeksStart = calendar.date(byAdding: .day, value: -14, to: startOfToday) else {
             return DateInterval(start: now, duration: 0)
         }
-        return DateInterval(start: startOfTwoWeeksAgo, end: startOfLastWeek)
+        return DateInterval(start: twoWeeksStart, end: weekStart)
     }
 
-    /// Last calendar month (full month).
+    /// Last 30 days ending yesterday (e.g., if today is Jan 30, returns Dec 31 - Jan 29).
     static var lastMonth: DateInterval {
         let calendar = Calendar.current
         let now = Date()
-        guard let startOfThisMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: now)),
-              let startOfLastMonth = calendar.date(byAdding: .month, value: -1, to: startOfThisMonth) else {
+        let startOfToday = calendar.startOfDay(for: now)
+        guard let monthStart = calendar.date(byAdding: .day, value: -30, to: startOfToday) else {
             return DateInterval(start: now, duration: 0)
         }
-        return DateInterval(start: startOfLastMonth, end: startOfThisMonth)
+        return DateInterval(start: monthStart, end: startOfToday)
     }
 
-    /// Two months ago (full month).
+    /// 30 days before lastMonth (e.g., if today is Jan 30, returns Dec 1-30).
+    /// No overlap with lastMonth.
     static var twoMonthsAgo: DateInterval {
         let calendar = Calendar.current
         let now = Date()
-        guard let startOfThisMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: now)),
-              let startOfLastMonth = calendar.date(byAdding: .month, value: -1, to: startOfThisMonth),
-              let startOfTwoMonthsAgo = calendar.date(byAdding: .month, value: -2, to: startOfThisMonth) else {
+        let startOfToday = calendar.startOfDay(for: now)
+        guard let monthStart = calendar.date(byAdding: .day, value: -30, to: startOfToday),
+              let twoMonthsStart = calendar.date(byAdding: .day, value: -60, to: startOfToday) else {
             return DateInterval(start: now, duration: 0)
         }
-        return DateInterval(start: startOfTwoMonthsAgo, end: startOfLastMonth)
+        return DateInterval(start: twoMonthsStart, end: monthStart)
     }
 }
