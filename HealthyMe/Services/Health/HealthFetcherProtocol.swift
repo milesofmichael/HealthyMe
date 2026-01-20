@@ -12,32 +12,31 @@ import Foundation
 /// Implementers must provide fetch methods for each health category.
 protocol HealthFetcherProtocol: Sendable {
 
-    // MARK: - Heart (Implemented)
+    // MARK: - Heart
 
     /// Fetch heart data (HR, resting HR, walking HR, HRV) averaged over a date interval.
     func fetchHeartData(for period: DateInterval) async throws -> HeartData
 
-    // MARK: - Sleep (TODO)
+    // MARK: - Sleep
 
-    /// Fetch sleep data (total sleep, REM, deep, awake) for a date interval.
-    /// TODO: Implement HKCategoryTypeIdentifier.sleepAnalysis queries
+    /// Fetch sleep data (total sleep, REM, core, deep, efficiency, awakenings) for a date interval.
+    /// Queries HKCategoryTypeIdentifier.sleepAnalysis and aggregates by sleep stage.
     func fetchSleepData(for period: DateInterval) async throws -> SleepData
 
-    // MARK: - Performance (TODO)
+    // MARK: - Performance
 
-    /// Fetch performance data (steps, distance, calories, exercise time) for a date interval.
-    /// TODO: Implement stepCount, distanceWalkingRunning, activeEnergyBurned, appleExerciseTime queries
+    /// Fetch performance data (steps, distance, calories, exercise time, VO2 max, walking speed,
+    /// six-minute walk distance) for a date interval.
     func fetchPerformanceData(for period: DateInterval) async throws -> PerformanceData
 
-    // MARK: - Vitality (TODO)
+    // MARK: - Vitality
 
-    /// Fetch vitality data (body temp, respiratory rate, blood pressure) for a date interval.
-    /// TODO: Implement bodyMass, respiratoryRate, oxygenSaturation queries
+    /// Fetch vitality data (body mass, BMI, respiratory rate, SpO2, wrist temperature) for a date interval.
     func fetchVitalityData(for period: DateInterval) async throws -> VitalityData
 
-    // MARK: - Mindfulness (TODO)
+    // MARK: - Mindfulness
 
-    /// Fetch mindfulness data (total minutes, session count) for a date interval.
-    /// TODO: Implement HKCategoryTypeIdentifier.mindfulSession queries
+    /// Fetch mindfulness data (total minutes, session count, average duration) for a date interval.
+    /// Queries HKCategoryTypeIdentifier.mindfulSession and aggregates session durations.
     func fetchMindfulnessData(for period: DateInterval) async throws -> MindfulnessData
 }

@@ -75,11 +75,11 @@ enum HealthCategory: String, CaseIterable, Codable, Sendable {
 
     var subtitle: String {
         switch self {
-        case .heart: return "Heart rate, HRV"
-        case .sleep: return "Sleep duration and quality"
+        case .heart: return "Heart rate, HRV, resting HR"
+        case .sleep: return "Sleep stages, efficiency"
         case .mindfulness: return "Mindful minutes, sessions"
-        case .performance: return "Steps, workouts, activity"
-        case .vitality: return "Temperature, respiratory rate"
+        case .performance: return "Steps, VO₂ max, activity"
+        case .vitality: return "Weight, SpO₂, respiratory"
         }
     }
 }

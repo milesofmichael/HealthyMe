@@ -3,7 +3,7 @@
 //  HealthyMe
 //
 //  Fetches health data from HealthKit.
-//  Heart category is fully implemented; other categories have stub implementations.
+//  Implements all category fetchers: Heart, Sleep, Performance, Vitality, Mindfulness.
 //
 
 import HealthKit
@@ -22,6 +22,11 @@ final class HealthFetcher: HealthFetcherProtocol {
     private static let meterUnit = HKUnit.meter()
     private static let calorieUnit = HKUnit.kilocalorie()
     private static let minuteUnit = HKUnit.minute()
+    private static let kgUnit = HKUnit.gramUnit(with: .kilo)
+    private static let percentUnit = HKUnit.percent()
+    private static let celsiusUnit = HKUnit.degreeCelsius()
+    private static let meterPerSecondUnit = HKUnit.meter().unitDivided(by: .second())
+    private static let vo2MaxUnit = HKUnit.literUnit(with: .milli).unitDivided(by: HKUnit.gramUnit(with: .kilo).unitMultiplied(by: .minute()))
 
     // MARK: - Heart (Implemented)
 
@@ -43,61 +48,160 @@ final class HealthFetcher: HealthFetcherProtocol {
         )
     }
 
-    // MARK: - Sleep (Stub)
+    // MARK: - Sleep
 
     func fetchSleepData(for period: DateInterval) async throws -> SleepData {
-        // TODO: Implement sleep data fetching
-        // 1. Query HKCategoryTypeIdentifier.sleepAnalysis
-        // 2. Filter samples by HKCategoryValueSleepAnalysis cases:
-        //    - .asleepREM, .asleepCore, .asleepDeep for sleep stages
-        //    - .inBed for total time in bed
-        //    - .awake for awakenings
-        // 3. Sum durations for each stage
-        // 4. Calculate sleep efficiency: (total asleep / time in bed) * 100
-        logger.warning("Sleep data fetching not yet implemented")
-        return SleepData.empty(for: period)
+        logger.debug("Fetching sleep data for \(period.start) to \(period.end)")
+
+        guard let sleepType = HKCategoryType.categoryType(forIdentifier: .sleepAnalysis) else {
+            logger.error("Sleep analysis type not available")
+            return SleepData.empty(for: period)
+        }
+
+        let predicate = HKQuery.predicateForSamples(
+            withStart: period.start,
+            end: period.end,
+            options: .strictStartDate
+        )
+
+        let samples = try await fetchCategorySamples(type: sleepType, predicate: predicate)
+
+        // Aggregate sleep stages by type
+        // O(n) where n = number of sleep samples, optimal for this operation
+        var remMinutes: Double = 0
+        var coreMinutes: Double = 0
+        var deepMinutes: Double = 0
+        var inBedMinutes: Double = 0
+        var awakeningsCount: Int = 0
+
+        for sample in samples {
+            let duration = sample.endDate.timeIntervalSince(sample.startDate) / 60.0  // Convert to minutes
+
+            switch sample.value {
+            case HKCategoryValueSleepAnalysis.asleepREM.rawValue:
+                remMinutes += duration
+            case HKCategoryValueSleepAnalysis.asleepCore.rawValue:
+                coreMinutes += duration
+            case HKCategoryValueSleepAnalysis.asleepDeep.rawValue:
+                deepMinutes += duration
+            case HKCategoryValueSleepAnalysis.inBed.rawValue:
+                inBedMinutes += duration
+            case HKCategoryValueSleepAnalysis.awake.rawValue:
+                awakeningsCount += 1
+            default:
+                // Legacy asleep values or unspecified stages add to core
+                if sample.value == HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue {
+                    coreMinutes += duration
+                }
+            }
+        }
+
+        let totalAsleep = remMinutes + coreMinutes + deepMinutes
+
+        // Calculate sleep efficiency: (time asleep / time in bed) * 100
+        let efficiency: Double? = inBedMinutes > 0 ? (totalAsleep / inBedMinutes) * 100 : nil
+
+        logger.debug("Sleep: \(totalAsleep) min total, \(efficiency ?? 0)% efficiency, \(awakeningsCount) awakenings")
+
+        return SleepData(
+            period: period,
+            totalSleepMinutes: totalAsleep > 0 ? totalAsleep : nil,
+            remMinutes: remMinutes > 0 ? remMinutes : nil,
+            coreMinutes: coreMinutes > 0 ? coreMinutes : nil,
+            deepSleepMinutes: deepMinutes > 0 ? deepMinutes : nil,
+            inBedMinutes: inBedMinutes > 0 ? inBedMinutes : nil,
+            sleepEfficiency: efficiency,
+            awakeningsCount: awakeningsCount > 0 ? awakeningsCount : nil
+        )
     }
 
-    // MARK: - Performance (Stub)
+    // MARK: - Performance
 
     func fetchPerformanceData(for period: DateInterval) async throws -> PerformanceData {
-        // TODO: Implement performance data fetching
-        // Use fetchSum() for cumulative metrics, fetchAverage() for rates
-        // Metrics to implement:
-        // - stepCount: fetchSum(for: .stepCount, unit: .count())
-        // - distanceWalkingRunning: fetchSum(for: .distanceWalkingRunning, unit: .meter())
-        // - activeEnergyBurned: fetchSum(for: .activeEnergyBurned, unit: .kilocalorie())
-        // - appleExerciseTime: fetchSum(for: .appleExerciseTime, unit: .minute())
-        // - vo2Max: fetchAverage(for: .vo2Max, unit: ml/(kg·min))
-        // - walkingSpeed: fetchAverage(for: .walkingSpeed, unit: m/s)
-        logger.warning("Performance data fetching not yet implemented")
-        return PerformanceData.empty(for: period)
+        logger.debug("Fetching performance data for \(period.start) to \(period.end)")
+
+        // Fetch all performance metrics concurrently
+        // Cumulative metrics use fetchSum(), rate metrics use fetchAverage()
+        async let steps = fetchSum(for: .stepCount, unit: Self.countUnit, period: period)
+        async let distance = fetchSum(for: .distanceWalkingRunning, unit: Self.meterUnit, period: period)
+        async let calories = fetchSum(for: .activeEnergyBurned, unit: Self.calorieUnit, period: period)
+        async let exercise = fetchSum(for: .appleExerciseTime, unit: Self.minuteUnit, period: period)
+        async let vo2 = fetchAverage(for: .vo2Max, unit: Self.vo2MaxUnit, period: period)
+        async let speed = fetchAverage(for: .walkingSpeed, unit: Self.meterPerSecondUnit, period: period)
+        async let sixMinWalk = fetchAverage(for: .sixMinuteWalkTestDistance, unit: Self.meterUnit, period: period)
+
+        return PerformanceData(
+            period: period,
+            stepCount: try await steps,
+            distanceMeters: try await distance,
+            activeCalories: try await calories,
+            exerciseMinutes: try await exercise,
+            vo2Max: try await vo2,
+            walkingSpeed: try await speed,
+            sixMinuteWalkDistance: try await sixMinWalk
+        )
     }
 
-    // MARK: - Vitality (Stub)
+    // MARK: - Vitality
 
     func fetchVitalityData(for period: DateInterval) async throws -> VitalityData {
-        // TODO: Implement vitality data fetching
-        // Metrics to implement:
-        // - bodyMass: fetchAverage(for: .bodyMass, unit: .pound() or .gramUnit(with: .kilo))
-        // - bodyMassIndex: fetchAverage(for: .bodyMassIndex, unit: .count())
-        // - respiratoryRate: fetchAverage(for: .respiratoryRate, unit: .count().unitDivided(by: .minute()))
-        // - oxygenSaturation: fetchAverage(for: .oxygenSaturation, unit: .percent())
-        // - appleSleepingWristTemperature: fetchAverage(for: .appleSleepingWristTemperature, unit: .degreeCelsius())
-        logger.warning("Vitality data fetching not yet implemented")
-        return VitalityData.empty(for: period)
+        logger.debug("Fetching vitality data for \(period.start) to \(period.end)")
+
+        // Fetch all vitality metrics concurrently
+        async let mass = fetchAverage(for: .bodyMass, unit: Self.kgUnit, period: period)
+        async let bmi = fetchAverage(for: .bodyMassIndex, unit: Self.countUnit, period: period)
+        async let respRate = fetchAverage(for: .respiratoryRate, unit: Self.bpmUnit, period: period)
+        async let spo2 = fetchAverage(for: .oxygenSaturation, unit: Self.percentUnit, period: period)
+        async let wristTemp = fetchAverage(for: .appleSleepingWristTemperature, unit: Self.celsiusUnit, period: period)
+
+        return VitalityData(
+            period: period,
+            bodyMass: try await mass,
+            bodyMassIndex: try await bmi,
+            respiratoryRate: try await respRate,
+            oxygenSaturation: try await spo2,
+            wristTemperature: try await wristTemp
+        )
     }
 
-    // MARK: - Mindfulness (Stub)
+    // MARK: - Mindfulness
 
     func fetchMindfulnessData(for period: DateInterval) async throws -> MindfulnessData {
-        // TODO: Implement mindfulness data fetching
-        // 1. Query HKCategoryTypeIdentifier.mindfulSession
-        // 2. Count number of sessions in period
-        // 3. Sum duration of all sessions
-        // 4. Calculate average session duration
-        logger.warning("Mindfulness data fetching not yet implemented")
-        return MindfulnessData.empty(for: period)
+        logger.debug("Fetching mindfulness data for \(period.start) to \(period.end)")
+
+        guard let mindfulType = HKCategoryType.categoryType(forIdentifier: .mindfulSession) else {
+            logger.error("Mindful session type not available")
+            return MindfulnessData.empty(for: period)
+        }
+
+        let predicate = HKQuery.predicateForSamples(
+            withStart: period.start,
+            end: period.end,
+            options: .strictStartDate
+        )
+
+        let samples = try await fetchCategorySamples(type: mindfulType, predicate: predicate)
+
+        // O(n) aggregation of mindfulness sessions
+        var totalMinutes: Double = 0
+        let sessionCount = samples.count
+
+        for sample in samples {
+            let duration = sample.endDate.timeIntervalSince(sample.startDate) / 60.0
+            totalMinutes += duration
+        }
+
+        // Calculate average session duration
+        let avgDuration: Double? = sessionCount > 0 ? totalMinutes / Double(sessionCount) : nil
+
+        logger.debug("Mindfulness: \(totalMinutes) min across \(sessionCount) sessions")
+
+        return MindfulnessData(
+            period: period,
+            totalMinutes: totalMinutes > 0 ? totalMinutes : nil,
+            sessionCount: sessionCount > 0 ? sessionCount : nil,
+            averageSessionDuration: avgDuration
+        )
     }
 
     // MARK: - Private Helpers
@@ -142,6 +246,78 @@ final class HealthFetcher: HealthFetcherProtocol {
                 let value = average.doubleValue(for: unit)
                 self.logger.debug("\(identifier.rawValue) average: \(value)")
                 continuation.resume(returning: value)
+            }
+
+            healthStore.execute(query)
+        }
+    }
+
+    /// Fetches the sum of values for a quantity type over a period.
+    /// Used for cumulative metrics like steps, distance, calories.
+    private func fetchSum(
+        for identifier: HKQuantityTypeIdentifier,
+        unit: HKUnit,
+        period: DateInterval
+    ) async throws -> Double? {
+        guard let quantityType = HKQuantityType.quantityType(forIdentifier: identifier) else {
+            logger.error("Invalid quantity type: \(identifier.rawValue)")
+            return nil
+        }
+
+        let predicate = HKQuery.predicateForSamples(
+            withStart: period.start,
+            end: period.end,
+            options: .strictStartDate
+        )
+
+        return try await withCheckedThrowingContinuation { continuation in
+            let query = HKStatisticsQuery(
+                quantityType: quantityType,
+                quantitySamplePredicate: predicate,
+                options: .cumulativeSum
+            ) { _, statistics, error in
+                if let error {
+                    self.logger.error("Sum query failed for \(identifier.rawValue): \(error.localizedDescription)")
+                    continuation.resume(throwing: error)
+                    return
+                }
+
+                guard let sum = statistics?.sumQuantity() else {
+                    self.logger.debug("No sum data for \(identifier.rawValue) in period")
+                    continuation.resume(returning: nil)
+                    return
+                }
+
+                let value = sum.doubleValue(for: unit)
+                self.logger.debug("\(identifier.rawValue) sum: \(value)")
+                continuation.resume(returning: value)
+            }
+
+            healthStore.execute(query)
+        }
+    }
+
+    /// Fetches category samples (e.g., sleep, mindfulness) for a given type and predicate.
+    private func fetchCategorySamples(
+        type: HKCategoryType,
+        predicate: NSPredicate
+    ) async throws -> [HKCategorySample] {
+        return try await withCheckedThrowingContinuation { continuation in
+            let query = HKSampleQuery(
+                sampleType: type,
+                predicate: predicate,
+                limit: HKObjectQueryNoLimit,
+                sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)]
+            ) { _, samples, error in
+                if let error {
+                    self.logger.error("Category query failed: \(error.localizedDescription)")
+                    continuation.resume(throwing: error)
+                    return
+                }
+
+                let categorySamples = samples as? [HKCategorySample] ?? []
+                self.logger.debug("Fetched \(categorySamples.count) category samples")
+                continuation.resume(returning: categorySamples)
             }
 
             healthStore.execute(query)
