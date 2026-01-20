@@ -45,6 +45,8 @@ struct CategoryDetailView: View {
                         // (Non-heart categories will show "not implemented" until fetchers are added)
                         timespanSummariesSection
                     }
+
+                    disclaimerFooter
                 }
                 .padding()
             }
@@ -258,6 +260,17 @@ struct CategoryDetailView: View {
                 )
             }
         }
+    }
+
+    // MARK: - Disclaimer
+
+    private var disclaimerFooter: some View {
+        Text("HealthyMe provides wellness insights for informational purposes only. This is not medical advice. Always consult a healthcare professional for medical decisions.")
+            .font(.caption2)
+            .foregroundStyle(.tertiary)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 16)
     }
 }
 
