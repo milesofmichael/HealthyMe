@@ -419,8 +419,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = HealthyMe;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
-				INFOPLIST_KEY_NSHealthShareUsageDescription = "HealthyMe uses your health data to provide personalized insights about your heart rate, sleep patterns, mindfulness sessions, and body measurements. Your data stays on your device and is analyzed using Apple Intelligence.";
-				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "HealthyMe may save health insights back to Apple Health.";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "HealthyMe reads your health data to show trends and provide personalized wellness insights using on-device Apple Intelligence. We access: Heart metrics (resting heart rate, walking heart rate, heart rate variability) to track cardiovascular health. Sleep data (duration, stages, efficiency) to analyze rest patterns. Activity stats (steps, distance, calories, exercise minutes, VO2 max, walking speed) to monitor fitness. Body measurements (weight, BMI, respiratory rate, blood oxygen, overnight temperature) to track vitals. Mindfulness sessions to encourage mental wellness. All analysis happens privately on your device—your data is never sent to external servers.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -461,8 +460,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = HealthyMe;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
-				INFOPLIST_KEY_NSHealthShareUsageDescription = "HealthyMe uses your health data to provide personalized insights about your heart rate, sleep patterns, mindfulness sessions, and body measurements. Your data stays on your device and is analyzed using Apple Intelligence.";
-				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "HealthyMe may save health insights back to Apple Health.";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "HealthyMe reads your health data to show trends and provide personalized wellness insights using on-device Apple Intelligence. We access: Heart metrics (resting heart rate, walking heart rate, heart rate variability) to track cardiovascular health. Sleep data (duration, stages, efficiency) to analyze rest patterns. Activity stats (steps, distance, calories, exercise minutes, VO2 max, walking speed) to monitor fitness. Body measurements (weight, BMI, respiratory rate, blood oxygen, overnight temperature) to track vitals. Mindfulness sessions to encourage mental wellness. All analysis happens privately on your device—your data is never sent to external servers.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
