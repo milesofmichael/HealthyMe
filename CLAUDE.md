@@ -69,6 +69,10 @@ features
     - monthly = update once a week
     - weekly = update once every 3 days
     - daily = update daily
+- settings page (gear icon in nav bar) with privacy policy and support links
+    - privacy policy: https://milesofmichael.github.io/HealthyMe/privacy (hosted via GitHub Pages in /docs)
+    - support/issues: https://github.com/milesofmichael/HealthyMe/issues
+    - WebKit is pre-warmed at app launch (background priority) so the privacy policy webview loads fast
 
 AI dev advice
 - use modern approachable 6.2 Swift Concurrency

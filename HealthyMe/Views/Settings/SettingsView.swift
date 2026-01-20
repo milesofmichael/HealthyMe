@@ -15,6 +15,7 @@ struct SettingsView: View {
     private let privacyPolicyURL = URL(string: "https://milesofmichael.github.io/HealthyMe/privacy")!
     private let issuesURL = URL(string: "https://github.com/milesofmichael/HealthyMe/issues")!
     private let sourceCodeURL = URL(string: "https://github.com/milesofmichael/HealthyMe")!
+    private let logger: LoggerServiceProtocol = LoggerService.shared
 
     var body: some View {
         NavigationStack {
@@ -28,6 +29,7 @@ struct SettingsView: View {
                             title: "Privacy Policy",
                             subtitle: "How we handle your health data"
                         ) {
+                            logger.info("Settings: Opening privacy policy")
                             showingPrivacyPolicy = true
                         }
                     }
@@ -40,6 +42,7 @@ struct SettingsView: View {
                             title: "Report an Issue",
                             subtitle: "Open a bug report on GitHub"
                         ) {
+                            logger.info("Settings: Opening GitHub Issues")
                             openURL(issuesURL)
                         }
 
@@ -49,6 +52,7 @@ struct SettingsView: View {
                             title: "View Source Code",
                             subtitle: "HealthyMe is open source"
                         ) {
+                            logger.info("Settings: Opening source code repo")
                             openURL(sourceCodeURL)
                         }
                     }
@@ -67,6 +71,9 @@ struct SettingsView: View {
             }
             .sheet(isPresented: $showingPrivacyPolicy) {
                 WebView(url: privacyPolicyURL, title: "Privacy Policy")
+            }
+            .onAppear {
+                logger.info("Settings: View appeared")
             }
         }
     }

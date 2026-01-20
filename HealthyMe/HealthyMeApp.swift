@@ -13,6 +13,11 @@ struct HealthyMeApp: App {
         WindowGroup {
             HomeView()
                 .environment(\.managedObjectContext, CoreDataService.shared.viewContext)
+                .task(priority: .background) {
+                    // Pre-warm WebKit processes at low priority so health
+                    // fetching and AI work take precedence
+                    WebKitWarmer.shared.warmUp()
+                }
         }
     }
 }
