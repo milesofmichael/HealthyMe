@@ -1,5 +1,5 @@
 overview
-- Health Panda is an iOS app that integrates Apple Health data with LLMs to give relevant health data
+- HealthyMe is an iOS app that integrates Apple Health data with LLMs to give relevant health data
 - used as a portfolio project to apply to iOS developer jobs
 
 technologies used
@@ -61,7 +61,7 @@ categories and metrics checked
 
 
 features
-- cute Panda integration in the beautiful and functional UI (follows Apple Human Interface Guidelines)
+- clean and functional UI that follows Apple Human Interface Guidelines
 - home screen has health categories (heart, sleep, mindfulness, etc)
 - clicking on categories will give LLM historical HealthKit data to see if you're trending positive or negative for each metric, then display to the user encouragement if they're trending positive, and what they can improve if a vital is trending negative
 - if there's zero data from the categories we tried to pull from, suggest that the user sync their data or give us more permissions to access that specific health information
