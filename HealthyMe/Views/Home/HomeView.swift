@@ -20,6 +20,7 @@ struct HomeView: View {
     @State private var aiStatus: AiAvailabilityStatus = .available
     @State private var summaries: [HealthCategory: CategorySummary] = [:]
     @State private var selectedCategory: HealthCategory?
+    @State private var showingSettings = false
 
     // Services accessed directly
     private let aiService: AiServiceProtocol = FoundationModelService.shared
@@ -38,8 +39,20 @@ struct HomeView: View {
                 .padding()
             }
             .navigationTitle("HealthyMe")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showingSettings = true
+                    } label: {
+                        Image(systemName: "gearshape")
+                    }
+                }
+            }
             .refreshable {
                 await refresh()
+            }
+            .sheet(isPresented: $showingSettings) {
+                SettingsView()
             }
             .sheet(item: $selectedCategory) { category in
                 CategoryDetailView(
