@@ -1,0 +1,35 @@
+APP NAME (30 character limit)
+HealthyMe - AI Health Insights
+
+
+SUBTITLE (30 character limit)
+Smart Trends, On-Device AI
+
+
+DESCRIPTION
+HealthyMe transforms your Apple Health data into meaningful insights using on-device AI. Instead of staring at raw numbers, get personalized summaries that explain what your health trends actually mean.
+
+INTELLIGENT TREND ANALYSIS
+See how your metrics are changing over time with daily, weekly, and monthly comparisons. HealthyMe identifies patterns and tells you whether you're improving, declining, or staying consistent—with clear explanations of why it matters.
+
+FIVE COMPREHENSIVE HEALTH CATEGORIES
+
+• Heart — Track resting heart rate, walking heart rate, HRV, and more. Understand your cardiovascular health at a glance.
+
+• Performance — Monitor steps, distance, active calories, VO2 Max, and exercise minutes. Know if your fitness is trending up.
+
+• Sleep — Analyze total sleep, stage breakdown (REM, Core, Deep), efficiency, and awakenings. Get insights into your rest quality.
+
+• Vitality — Follow weight, BMI, respiratory rate, blood oxygen, and wrist temperature trends over time.
+
+• Mindfulness — Track meditation sessions, total mindful minutes, and consistency patterns.
+
+PRIVACY BY DESIGN
+All AI processing happens entirely on your device using Apple Intelligence. Your health data never leaves your iPhone. No accounts, no cloud uploads, no tracking.
+
+ALWAYS READY
+Cached data loads instantly so you never wait for a loading screen. Background updates keep everything fresh without interrupting your experience.
+
+
+KEYWORDS (100 character limit)
+health,fitness,AI,trends,heart rate,sleep,VO2 Max,HRV,wellness,tracker,insights,Apple Watch
