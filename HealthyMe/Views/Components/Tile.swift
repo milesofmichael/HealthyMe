@@ -166,6 +166,69 @@ struct WarningTile: View {
     }
 }
 
+// MARK: - Switch Tile
+
+/// Tile variant with a toggle switch instead of navigation chevron
+struct SwitchTile: View {
+    let icon: String
+    let iconColor: Color
+    let title: String
+    let subtitle: String
+    @Binding var isOn: Bool
+
+    init(
+        icon: String,
+        iconColor: Color = .accentColor,
+        title: String,
+        subtitle: String,
+        isOn: Binding<Bool>
+    ) {
+        self.icon = icon
+        self.iconColor = iconColor
+        self.title = title
+        self.subtitle = subtitle
+        self._isOn = isOn
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            // Leading icon
+            Image(systemName: icon)
+                .font(.title2)
+                .foregroundStyle(iconColor)
+                .frame(width: 32)
+
+            // Title and subtitle
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer()
+
+            // Toggle switch
+            Toggle("", isOn: $isOn)
+                .labelsHidden()
+                .tint(.categoryPerformance)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .frame(minHeight: 70)
+        .background(Color.backgroundPrimary)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.borderNormal, lineWidth: 1)
+        )
+    }
+}
+
 // MARK: - Previews
 
 #Preview("Tile Styles") {
@@ -186,6 +249,14 @@ struct WarningTile: View {
         ErrorTile(
             title: "Apple Intelligence",
             subtitle: "Enable in Settings to continue"
+        )
+
+        SwitchTile(
+            icon: "play.circle.fill",
+            iconColor: .categoryPerformance,
+            title: "Demo Mode",
+            subtitle: "Show sample health data",
+            isOn: .constant(true)
         )
     }
     .padding()

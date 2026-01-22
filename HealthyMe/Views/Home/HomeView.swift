@@ -14,6 +14,9 @@
 import SwiftUI
 
 struct HomeView: View {
+    // Session provides appropriate services based on mode (standard/demo)
+    @Environment(AppSession.self) private var session
+
     // Local UI state
     @State private var isLoading = true
     @State private var isRefreshing = false
@@ -21,10 +24,6 @@ struct HomeView: View {
     @State private var summaries: [HealthCategory: CategorySummary] = [:]
     @State private var selectedCategory: HealthCategory?
     @State private var showingSettings = false
-
-    // Services accessed directly
-    private let aiService: AiServiceProtocol = FoundationModelService.shared
-    private let healthService: HealthServiceProtocol = HealthService.shared
 
     var body: some View {
         NavigationStack {
@@ -57,8 +56,7 @@ struct HomeView: View {
             .sheet(item: $selectedCategory) { category in
                 CategoryDetailView(
                     category: category,
-                    summary: summaries[category],
-                    healthService: healthService
+                    summary: summaries[category]
                 )
             }
             .onChange(of: selectedCategory) { oldValue, newValue in
@@ -66,10 +64,17 @@ struct HomeView: View {
                 // This syncs home tile with any summaries generated in the detail view
                 if newValue == nil, let category = oldValue {
                     Task {
-                        if let updated = await healthService.getCachedSummary(for: category) {
+                        if let updated = await session.healthService.getCachedSummary(for: category) {
                             summaries[category] = updated
                         }
                     }
+                }
+            }
+            .onChange(of: session.currentMode) {
+                // Refresh data when switching between standard/demo mode
+                Task {
+                    summaries = [:]
+                    await refresh()
                 }
             }
         }
@@ -110,11 +115,11 @@ struct HomeView: View {
         }
 
         // Check AI status
-        aiStatus = await aiService.checkAvailability()
+        aiStatus = await session.aiService.checkAvailability()
 
         // Use the unified monolith refresh from HealthService
         // This shows cached data immediately, then refreshes stale data in background
-        await healthService.refreshAllCategories { category, summary in
+        await session.healthService.refreshAllCategories { category, summary in
             // This callback is invoked on MainActor as each category completes
             summaries[category] = summary
         }
@@ -161,7 +166,7 @@ struct HomeView: View {
         }
 
         // HealthKit unavailable (device doesn't support it)
-        if !healthService.isHealthDataAvailable {
+        if !session.healthService.isHealthDataAvailable {
             ErrorTile(
                 icon: "heart.slash",
                 title: "Health Data Unavailable",
@@ -237,4 +242,5 @@ extension HealthCategory: Identifiable {
 
 #Preview("Home") {
     HomeView()
+        .environment(AppSession())
 }

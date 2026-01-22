@@ -16,8 +16,9 @@ import SwiftUI
 struct CategoryDetailView: View {
     let category: HealthCategory
     let summary: CategorySummary?
-    let healthService: HealthServiceProtocol
 
+    // Session provides appropriate health service based on mode (standard/demo)
+    @Environment(AppSession.self) private var session
     @Environment(\.dismiss) private var dismiss
     @State private var currentSummary: CategorySummary?
     @State private var isLoading = false
@@ -75,7 +76,7 @@ struct CategoryDetailView: View {
         currentSummary = summary
 
         // Check auth status
-        authStatus = await healthService.checkAuthorizationStatus(for: category)
+        authStatus = await session.healthService.checkAuthorizationStatus(for: category)
         guard authStatus == .authorized else { return }
 
         // STEP 1: Load cached timespan data IMMEDIATELY (before any refresh)
@@ -83,7 +84,7 @@ struct CategoryDetailView: View {
 
         // STEP 2: Background refresh category summary if needed
         if currentSummary == nil {
-            currentSummary = await healthService.refreshCategory(category)
+            currentSummary = await session.healthService.refreshCategory(category)
         }
     }
 
@@ -92,19 +93,19 @@ struct CategoryDetailView: View {
         isLoading = true
         defer { isLoading = false }
 
-        _ = try? await healthService.requestAuthorization(for: category)
-        authStatus = await healthService.checkAuthorizationStatus(for: category)
+        _ = try? await session.healthService.requestAuthorization(for: category)
+        authStatus = await session.healthService.checkAuthorizationStatus(for: category)
 
         if authStatus == .authorized {
             // First time - no cache, need to fetch everything
-            currentSummary = await healthService.refreshCategory(category)
+            currentSummary = await session.healthService.refreshCategory(category)
             await fetchTimespanSummaries()
         }
     }
 
     /// Load cached timespan data immediately, refresh stale data in background.
     private func fetchTimespanSummaries() async {
-        await healthService.fetchTimespanSummaries(for: category) { timeSpan, state in
+        await session.healthService.fetchTimespanSummaries(for: category) { timeSpan, state in
             timespanStates[timeSpan] = state
         }
     }
@@ -285,17 +286,17 @@ struct CategoryDetailView: View {
             smallSummary: "Heart rate trending up 3%",
             largeSummary: "Your heart rate has increased slightly this month compared to last month, averaging 72 BPM versus 70 BPM. Your resting heart rate remains healthy at 58 BPM. Overall, your cardiovascular metrics indicate good heart health.",
             lastUpdated: Date()
-        ),
-        healthService: HealthService.shared
+        )
     )
+    .environment(AppSession())
 }
 
 #Preview("Heart - No Data") {
     CategoryDetailView(
         category: .heart,
-        summary: CategorySummary.noData(for: .heart),
-        healthService: HealthService.shared
+        summary: CategorySummary.noData(for: .heart)
     )
+    .environment(AppSession())
 }
 
 #Preview("Sleep - Fallback Summary") {
@@ -307,7 +308,7 @@ struct CategoryDetailView: View {
             smallSummary: "Sleep is improving",
             largeSummary: "Your sleep patterns have been consistent this week.",
             lastUpdated: Date()
-        ),
-        healthService: HealthService.shared
+        )
     )
+    .environment(AppSession())
 }

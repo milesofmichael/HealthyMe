@@ -2,13 +2,15 @@
 //  SettingsView.swift
 //  HealthyMe
 //
-//  Settings screen with app information and legal links.
+//  Settings screen with app information, legal links, and demo mode toggle.
 //  Uses Tile components for consistent styling with the rest of the app.
 //
 
 import SwiftUI
 
 struct SettingsView: View {
+    // Session for demo mode toggle
+    @Environment(AppSession.self) private var session
     @Environment(\.dismiss) private var dismiss
     @State private var showingPrivacyPolicy = false
 
@@ -18,6 +20,8 @@ struct SettingsView: View {
     private let logger: LoggerServiceProtocol = LoggerService.shared
 
     var body: some View {
+        @Bindable var session = session
+
         NavigationStack {
             ScrollView {
                 VStack(spacing: 24) {
@@ -55,6 +59,17 @@ struct SettingsView: View {
                             logger.info("Settings: Opening source code repo")
                             openURL(sourceCodeURL)
                         }
+                    }
+
+                    // MARK: - Developer Section
+                    SettingsSection(title: "Developer") {
+                        SwitchTile(
+                            icon: "play.circle.fill",
+                            iconColor: .categoryPerformance,
+                            title: "Demo Mode",
+                            subtitle: "Show sample health data",
+                            isOn: $session.isDemoMode
+                        )
                     }
                 }
                 .padding()
@@ -107,4 +122,5 @@ struct SettingsSection<Content: View>: View {
 
 #Preview {
     SettingsView()
+        .environment(AppSession())
 }
