@@ -86,3 +86,9 @@ AI dev advice
     - anything you'd normally use Info.plist for, check the .xcodeproj file and do it there instead
 - any colors in the UI should come from (or be added to) Colors.swift
     - use Color Literal and Hex for color values
+
+testing
+- demo mode: made to test/show features and pass App Store review
+    - `HealthyMe/Services/Session` files handle toggling in to Demo mode
+- data is shared between unit tests and demo mode
+    - `HealthyMe/Mocks`

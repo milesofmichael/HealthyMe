@@ -37,13 +37,13 @@ flowchart TB
     subgraph HealthServices["Health Service Layer"]
         HealthServiceProtocol["HealthServiceProtocol<br/>(protocol)"]
         HealthService["HealthService<br/>Real HealthKit"]
-        DemoHealthService["DemoHealthService<br/>Sample Data"]
+        MockHealthService["MockHealthService<br/>Sample Data"]
     end
 
     subgraph DataLayer["Data Layer"]
         HealthFetcherProtocol["HealthFetcherProtocol<br/>(protocol)"]
         HealthFetcher["HealthFetcher"]
-        DemoHealthFetcher["DemoHealthFetcher"]
+        MockHealthFetcher["MockHealthFetcher"]
     end
 
     %% App initialization
@@ -60,11 +60,11 @@ flowchart TB
 
     %% Service selection based on mode
     AppMode -.->|".standard"| HealthService
-    AppMode -.->|".demo"| DemoHealthService
+    AppMode -.->|".demo"| MockHealthService
 
     %% Service dependencies
     HealthService --> HealthFetcher
-    DemoHealthService --> DemoHealthFetcher
+    MockHealthService --> MockHealthFetcher
 
     style SessionProtocol fill:#ff9,stroke:#333,stroke-width:2px,color:#333
     style AppMode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
@@ -139,16 +139,16 @@ classDiagram
         +Uses Foundation Model for summaries
     }
 
-    class DemoHealthService {
+    class MockHealthService {
         <<actor>>
-        -demoData: DemoDataProvider
+        +Uses MockHeartData, MockSleepData, etc.
         +Returns sample data immediately
         +No HealthKit dependency
         +Pre-written summaries
     }
 
     HealthServiceProtocol <|.. HealthService
-    HealthServiceProtocol <|.. DemoHealthService
+    HealthServiceProtocol <|.. MockHealthService
 ```
 
 | Method | Demo Implementation |
@@ -163,7 +163,7 @@ classDiagram
 
 ### HealthFetcherProtocol
 
-If `DemoHealthService` uses composition (recommended), it needs a `DemoHealthFetcher`:
+If `MockHealthService` uses composition (recommended), it needs a `MockHealthFetcher`:
 
 ```mermaid
 classDiagram
@@ -183,14 +183,14 @@ classDiagram
         +Queries HKCategoryType
     }
 
-    class DemoHealthFetcher {
+    class MockHealthFetcher {
         <<struct>>
         +Returns static sample data
         +No HealthKit import needed
     }
 
     HealthFetcherProtocol <|.. HealthFetcher
-    HealthFetcherProtocol <|.. DemoHealthFetcher
+    HealthFetcherProtocol <|.. MockHealthFetcher
 ```
 
 | Method | Demo Data |
@@ -216,11 +216,68 @@ HealthyMe/
 │   │   ├── HealthServiceProtocol.swift   # existing
 │   │   ├── HealthService.swift           # existing
 │   │   ├── HealthFetcherProtocol.swift   # existing
-│   │   ├── HealthFetcher.swift           # existing
-│   │   └── Demo/                         # NEW
-│   │       ├── DemoHealthService.swift
-│   │       ├── DemoHealthFetcher.swift
-│   │       └── DemoDataProvider.swift
+│   │   └── HealthFetcher.swift           # existing
+├── Mocks/                          # NEW - shared by demo mode & tests
+│   ├── Services/
+│   │   ├── MockHealthService.swift
+│   │   └── MockHealthFetcher.swift
+│   └── Models/
+│       ├── MockHeartData.swift
+│       ├── MockSleepData.swift
+│       ├── MockPerformanceData.swift
+│       ├── MockVitalityData.swift
+│       └── MockMindfulnessData.swift
+```
+
+---
+
+## Mock Data for Demo Mode & Tests
+
+Mock structs mirror real data models with sensible defaults. Demo mode uses defaults; tests override as needed.
+
+```swift
+/// Mock heart metrics with healthy defaults.
+struct MockHeartData {
+    var heartRate: Double = 72
+    var restingHeartRate: Double = 58
+    var walkingHeartRate: Double = 95
+    var hrv: Double = 45
+}
+
+/// Mock performance metrics with healthy defaults.
+struct MockPerformanceData {
+    var stepCount: Int = 8432
+    var distance: Double = 4.2  // miles
+    var activeCalories: Int = 320
+    var exerciseMinutes: Int = 35
+    var vo2Max: Double? = 42.5
+}
+
+/// Mock sleep metrics with healthy defaults.
+struct MockSleepData {
+    var totalHours: Double = 7.5
+    var remPercent: Double = 0.22
+    var corePercent: Double = 0.55
+    var deepPercent: Double = 0.18
+    var awakenings: Int = 2
+}
+
+// MockVitalityData, MockMindfulnessData follow same pattern...
+```
+
+### Usage
+
+```swift
+// Demo mode: use all defaults
+let heart = MockHeartData()
+let sleep = MockSleepData()
+
+// Unit test: override specific values
+var heart = MockHeartData()
+heart.heartRate = 120  // test tachycardia
+
+var sleep = MockSleepData()
+sleep.totalHours = 4   // test sleep deprivation
 ```
 
 ---
@@ -262,8 +319,7 @@ In App Store Connect → App Review Information → Notes:
 | `AppMode` | Enum for operating modes | NEW |
 | `SessionProtocol` | Central session management | NEW |
 | `AppSession` | Observable implementation | NEW |
-| `DemoHealthService` | Sample data service | NEW |
-| `DemoHealthFetcher` | Sample data fetcher | NEW |
-| `DemoDataProvider` | Static sample health values | NEW |
+| `Mocks/Services/` | MockHealthService, MockHealthFetcher | NEW |
+| `Mocks/Models/` | MockHeartData, MockSleepData, etc. | NEW |
 | `HealthServiceProtocol` | Service interface | EXISTING |
 | `HealthFetcherProtocol` | Fetcher interface | EXISTING |
