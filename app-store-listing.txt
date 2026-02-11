@@ -30,6 +30,9 @@ All AI processing happens entirely on your device using Apple Intelligence. Your
 ALWAYS READY
 Cached data loads instantly so you never wait for a loading screen. Background updates keep everything fresh without interrupting your experience.
 
+IMPORTANT DISCLAIMER
+HealthyMe is designed for informational and educational purposes only and is not intended to diagnose, treat, cure, or prevent any disease or health condition. The insights provided by this app should not be considered medical advice. Always consult a qualified healthcare professional before making any health-related decisions or changes to your lifestyle, diet, or exercise routine. If you are experiencing a medical emergency, call your local emergency services immediately.
+
 
 KEYWORDS (100 character limit)
 health,fitness,AI,trends,heart rate,sleep,VO2 Max,HRV,wellness,tracker,insights,Apple Watch

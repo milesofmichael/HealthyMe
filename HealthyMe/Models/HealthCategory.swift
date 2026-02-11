@@ -44,6 +44,19 @@ protocol HealthComparison: Sendable {
     var fallbackSummary: String { get }
 }
 
+// MARK: - Medical Source
+
+/// Authoritative medical source for a health category's metrics.
+/// Used to provide citations alongside AI-generated insights,
+/// ensuring users can verify health information from trusted organizations.
+struct MedicalSource: Sendable, Identifiable {
+    let title: String
+    let organization: String
+    let url: URL
+
+    var id: URL { url }
+}
+
 // MARK: - Health Category
 
 enum HealthCategory: String, CaseIterable, Codable, Sendable {
@@ -80,6 +93,115 @@ enum HealthCategory: String, CaseIterable, Codable, Sendable {
         case .mindfulness: return "Mindful minutes, sessions"
         case .performance: return "Steps, VO₂ max, activity"
         case .vitality: return "Weight, SpO₂, respiratory"
+        }
+    }
+
+    /// Category-specific phrasing for the disclaimer's reference to sources below.
+    var sourcesHint: String {
+        switch self {
+        case .heart: return "a healthy heart"
+        case .sleep: return "healthy sleep habits"
+        case .mindfulness: return "the benefits of mindfulness meditation"
+        case .performance: return "physical activity guidelines"
+        case .vitality: return "vital health indicators"
+        }
+    }
+
+    /// Authoritative medical sources for the metrics in this category.
+    /// Displayed as citations alongside AI-generated insights so users
+    /// can verify health information from trusted organizations.
+    var sources: [MedicalSource] {
+        switch self {
+        case .heart:
+            return [
+                MedicalSource(
+                    title: "All About Heart Rate",
+                    organization: "American Heart Association",
+                    url: URL(string: "https://www.heart.org/en/health-topics/high-blood-pressure/the-facts-about-high-blood-pressure/all-about-heart-rate-pulse")!
+                ),
+                MedicalSource(
+                    title: "Heart Rate: What's Normal?",
+                    organization: "Mayo Clinic",
+                    url: URL(string: "https://www.mayoclinic.org/healthy-lifestyle/fitness/expert-answers/heart-rate/faq-20057979")!
+                ),
+                MedicalSource(
+                    title: "Heart Rate Variability (HRV)",
+                    organization: "Cleveland Clinic",
+                    url: URL(string: "https://my.clevelandclinic.org/health/symptoms/21773-heart-rate-variability-hrv")!
+                ),
+            ]
+        case .sleep:
+            return [
+                MedicalSource(
+                    title: "Sleep and Sleep Disorders",
+                    organization: "CDC",
+                    url: URL(string: "https://www.cdc.gov/sleep/")!
+                ),
+                MedicalSource(
+                    title: "Sleep Deprivation and Deficiency",
+                    organization: "National Heart, Lung, and Blood Institute",
+                    url: URL(string: "https://www.nhlbi.nih.gov/health/sleep-deprivation")!
+                ),
+                MedicalSource(
+                    title: "Stages of Sleep",
+                    organization: "Sleep Foundation",
+                    url: URL(string: "https://www.sleepfoundation.org/stages-of-sleep")!
+                ),
+            ]
+        case .performance:
+            return [
+                MedicalSource(
+                    title: "Physical Activity",
+                    organization: "World Health Organization",
+                    url: URL(string: "https://www.who.int/news-room/fact-sheets/detail/physical-activity")!
+                ),
+                MedicalSource(
+                    title: "Physical Activity Recommendations",
+                    organization: "American Heart Association",
+                    url: URL(string: "https://www.heart.org/en/healthy-living/fitness/fitness-basics/aha-recs-for-physical-activity-in-adults")!
+                ),
+                MedicalSource(
+                    title: "Physical Activity Basics",
+                    organization: "CDC",
+                    url: URL(string: "https://www.cdc.gov/physicalactivity/")!
+                ),
+            ]
+        case .vitality:
+            return [
+                MedicalSource(
+                    title: "Obesity and Overweight",
+                    organization: "World Health Organization",
+                    url: URL(string: "https://www.who.int/news-room/fact-sheets/detail/obesity-and-overweight")!
+                ),
+                MedicalSource(
+                    title: "Pulse Oximetry",
+                    organization: "Mayo Clinic",
+                    url: URL(string: "https://www.mayoclinic.org/tests-procedures/pulse-oximetry/about/pac-20385604")!
+                ),
+                MedicalSource(
+                    title: "Vital Signs",
+                    organization: "MedlinePlus (NIH)",
+                    url: URL(string: "https://medlineplus.gov/vitalsigns.html")!
+                ),
+            ]
+        case .mindfulness:
+            return [
+                MedicalSource(
+                    title: "Meditation and Mindfulness",
+                    organization: "NIH — NCCIH",
+                    url: URL(string: "https://www.nccih.nih.gov/health/meditation-and-mindfulness-what-you-need-to-know")!
+                ),
+                MedicalSource(
+                    title: "Mindfulness Meditation",
+                    organization: "American Psychological Association",
+                    url: URL(string: "https://www.apa.org/topics/mindfulness/meditation")!
+                ),
+                MedicalSource(
+                    title: "Meditation: A Simple, Fast Way to Reduce Stress",
+                    organization: "Mayo Clinic",
+                    url: URL(string: "https://www.mayoclinic.org/tests-procedures/meditation/in-depth/meditation/art-20045858")!
+                ),
+            ]
         }
     }
 }

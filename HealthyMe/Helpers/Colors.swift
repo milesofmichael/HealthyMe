@@ -51,6 +51,11 @@ extension Color {
     /// White for high-contrast text on colored backgrounds
     static let textOnColor = Color.white
 
+    /// Subtle link color for footnote-style citations (adapts to system)
+    static var linkSubtle: Color {
+        Color(.tertiaryLabel)
+    }
+
     // MARK: - System Colors
     // These colors adapt to light/dark mode automatically
 

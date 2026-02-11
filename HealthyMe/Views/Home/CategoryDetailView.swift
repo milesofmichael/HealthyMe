@@ -24,6 +24,9 @@ struct CategoryDetailView: View {
     @State private var isLoading = false
     @State private var authStatus: HealthAuthorizationStatus = .notDetermined
 
+    // Source selected for in-app webview
+    @State private var selectedSource: MedicalSource?
+
     // Timespan loading states (uses Dictionary for O(1) lookup)
     @State private var timespanStates: [TimeSpan: SummaryLoadingState] = [
         .daily: .idle,
@@ -47,12 +50,18 @@ struct CategoryDetailView: View {
                         timespanSummariesSection
                     }
 
-                    disclaimerFooter
+                    VStack(spacing: 6) {
+                        disclaimerFooter
+                        sourcesFooter
+                    }
                 }
                 .padding()
             }
             .navigationTitle(category.rawValue)
             .navigationBarTitleDisplayMode(.large)
+            .sheet(item: $selectedSource) { source in
+                WebView(url: source.url, title: source.title)
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") {
@@ -263,15 +272,34 @@ struct CategoryDetailView: View {
         }
     }
 
-    // MARK: - Disclaimer
+    // MARK: - Disclaimer & Sources
 
     private var disclaimerFooter: some View {
-        Text("HealthyMe provides wellness insights for informational purposes only. This is not medical advice. Always consult a healthcare professional for medical decisions.")
+        Text("HealthyMe provides wellness insights for informational purposes only. This is not medical advice. Always consult a healthcare professional for medical decisions. Refer to the sources below for more information on \(category.sourcesHint).")
             .font(.caption2)
             .foregroundStyle(.tertiary)
             .multilineTextAlignment(.center)
             .frame(maxWidth: .infinity)
             .padding(.horizontal, 16)
+    }
+
+    /// Compact medical citations shown as small links below the disclaimer.
+    /// Tapping opens an in-app webview rather than leaving the app.
+    /// Required by App Store guideline 1.4.1 for apps presenting health information.
+    private var sourcesFooter: some View {
+        VStack(alignment: .center, spacing: 4) {
+            ForEach(category.sources, id: \.url) { source in
+                Button {
+                    selectedSource = source
+                } label: {
+                    Text("\(source.title) — \(source.organization)")
+                        .font(.caption2)
+                        .foregroundStyle(Color.linkSubtle)
+                        .underline()
+                }
+            }
+        }
+        .frame(maxWidth: .infinity)
     }
 }
 
